@@ -1,0 +1,198 @@
+name: Publish to Helm Charts Repository
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+    paths:
+      - "helm/**"
+      - ".github/workflows/publish-to-helm-charts.yml"
+  workflow_dispatch:
+    inputs:
+      force_publish:
+        description: "Force publish even if version exists"
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  publish-chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "latest"
+
+      - name: Validate Chart
+        run: |
+          echo "🔍 Validating Helm chart..."
+          helm lint helm/s3_metrics_adapter/
+          helm template test-release helm/s3_metrics_adapter/ > /dev/null
+          echo "✅ Chart validation successful"
+
+      - name: Package Chart
+        run: |
+          echo "📦 Packaging Helm chart..."
+          helm package helm/s3_metrics_adapter/ --destination ./packaged-charts/
+          ls -la ./packaged-charts/
+
+      - name: Checkout helm-charts repository
+        uses: actions/checkout@v4
+        with:
+          repository: code-by-rupinder/helm-charts
+          token: ${{ secrets.HELM_CHARTS_TOKEN }}
+          path: helm-charts-repo
+          fetch-depth: 0
+        continue-on-error: true
+
+      - name: Initialize helm-charts repository if needed
+        run: |
+          if [[ ! -d "helm-charts-repo/.git" ]]; then
+            echo "🔧 Initializing empty helm-charts repository..."
+            git clone https://${{ secrets.HELM_CHARTS_TOKEN }}@github.com/code-by-rupinder/helm-charts.git helm-charts-repo
+            cd helm-charts-repo
+            
+            # Initialize with basic structure if empty
+            if [[ -z "$(ls -A .)" ]]; then
+              echo "# Helm Charts Repository" > README.md
+              echo "" >> README.md
+              echo "This repository contains Helm charts for s3-metrics-adapter and other projects." >> README.md
+              echo "" >> README.md
+              echo "## Usage" >> README.md
+              echo "" >> README.md
+              echo "```bash" >> README.md
+              echo "helm repo add codebyrupinder https://code-by-rupinder.github.io/helm-charts/" >> README.md
+              echo "helm repo update" >> README.md
+              echo "```" >> README.md
+              
+              mkdir -p charts packages
+              
+              git config user.name "Rupinder"
+              git config user.email "codebyrupinder@gmail.com"
+              git add .
+              git commit -m "🎉 Initialize helm-charts repository
+
+              📦 Repository Structure:
+              - charts/: Source chart directories
+              - packages/: Packaged chart files
+              - index.yaml: Helm repository index
+
+              🤖 Auto-initialized by GitHub Actions"
+              git push origin main
+            fi
+          fi
+
+      - name: Copy chart to helm-charts repo
+        run: |
+          echo "📋 Copying chart to helm-charts repository..."
+
+          # Create charts directory if it doesn't exist
+          mkdir -p helm-charts-repo/charts/s3-metrics-adapter/
+
+          # Copy the chart source
+          cp -r helm/s3_metrics_adapter/* helm-charts-repo/charts/s3-metrics-adapter/
+
+          # Copy packaged chart
+          mkdir -p helm-charts-repo/packages/
+          cp packaged-charts/*.tgz helm-charts-repo/packages/
+
+      - name: Update Chart Repository Index
+        run: |
+          cd helm-charts-repo
+
+          echo "📇 Updating Helm repository index..."
+          helm repo index packages/ --url https://code-by-rupinder.github.io/helm-charts/packages/
+
+          # Update root index if needed (only if index.yaml exists, is not empty, and looks valid)
+          if [ -s index.yaml ] && grep -q 'apiVersion:' index.yaml; then
+            helm repo index . --url https://code-by-rupinder.github.io/helm-charts/ --merge index.yaml
+          else
+            helm repo index . --url https://code-by-rupinder.github.io/helm-charts/
+          fi
+
+          echo "📋 Repository index updated:"
+          cat index.yaml | head -20
+
+      - name: Commit and Push to helm-charts
+        run: |
+          cd helm-charts-repo
+
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Check for changes
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "🚀 Publishing changes to helm-charts repository..."
+            # Get chart version for commit message
+            CHART_VERSION=$(helm show chart ../helm/s3_metrics_adapter/ | grep '^version:' | awk '{print $2}')
+            APP_VERSION=$(helm show chart ../helm/s3_metrics_adapter/ | grep '^appVersion:' | awk '{print $2}' | tr -d '"')
+            git add .
+            git commit -m "🚀 Publish s3-metrics-adapter chart v${CHART_VERSION} (app: ${APP_VERSION})
+
+            📦 Chart Details:
+            - Chart Version: ${CHART_VERSION}
+            - App Version: ${APP_VERSION}
+            - Source: ${{ github.repository }}@${{ github.sha }}
+
+            🔗 Auto-published from: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            # Use token for authentication
+            git push https://${{ secrets.HELM_CHARTS_TOKEN }}@github.com/code-by-rupinder/helm-charts.git main
+            echo "✅ Successfully published to helm-charts repository!"
+            echo "🌐 Charts available at: https://codebyrupinder.github.io/helm-charts/"
+          else
+            echo "ℹ️ No changes to publish"
+          fi
+
+      - name: Create Release Summary
+        run: |
+          CHART_VERSION=$(helm show chart helm/s3_metrics_adapter/ | grep '^version:' | awk '{print $2}')
+          APP_VERSION=$(helm show chart helm/s3_metrics_adapter/ | grep '^appVersion:' | awk '{print $2}' | tr -d '"')
+
+          echo "## 🚀 Helm Chart Published Successfully!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Chart Information" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chart Name**: s3-metrics-adapter" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chart Version**: ${CHART_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **App Version**: ${APP_VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Published To**: [helm-charts repository](https://github.com/code-by-rupinder/helm-charts)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🛠️ Installation Commands" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Add the repository" >> $GITHUB_STEP_SUMMARY
+          echo "helm repo add codebyrupinder https://code-by-rupinder.github.io/helm-charts/" >> $GITHUB_STEP_SUMMARY
+          echo "helm repo update" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Install the chart" >> $GITHUB_STEP_SUMMARY
+          echo "helm install my-s3-adapter codebyrupinder/s3-metrics-adapter" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🌐 Repository Access" >> $GITHUB_STEP_SUMMARY
+          echo "- **Helm Repository**: https://code-by-rupinder.github.io/helm-charts/" >> $GITHUB_STEP_SUMMARY
+          echo "- **Chart Source**: https://github.com/code-by-rupinder/helm-charts/tree/main/charts/s3-metrics-adapter" >> $GITHUB_STEP_SUMMARY
+          echo "- **Browse Charts**: https://github.com/code-by-rupinder/helm-charts" >> $GITHUB_STEP_SUMMARY
+
+  notify-on-failure:
+    runs-on: ubuntu-latest
+    needs: publish-chart
+    if: failure()
+    steps:
+      - name: Notify Failure
+        run: |
+          echo "❌ Helm chart publishing failed!"
+          echo "Please check the workflow logs for details."
+          echo "Common issues:"
+          echo "1. HELM_CHARTS_TOKEN secret not configured"
+          echo "2. Chart validation errors"
+          echo "3. Repository access permissions"

@@ -1,0 +1,103 @@
+# values-selfmanaged.yaml
+# Example configuration for self-managed Kubernetes clusters
+# Use this for on-premises, bare metal, or VM-based Kubernetes clusters
+
+replicaCount: 2
+
+image:
+  repository: codebyrupinder/s3_metrics_adapter
+  tag: "1.0.1"
+  pullPolicy: IfNotPresent
+
+# AWS Credentials for self-managed Kubernetes
+# Method 1: Create secret with credentials (for development/testing)
+awsCredentials:
+  create: true
+  region: "us-west-2"
+  # IMPORTANT: Never put real credentials in values files!
+  # Use one of these methods instead:
+  # 1. Command line: --set-string awsCredentials.accessKeyId=YOUR_KEY
+  # 2. External secret management (recommended)
+  # 3. Instance profile on EC2
+
+# Method 2: Use existing secret (recommended for production)
+# awsCredentials:
+#   existingSecret:
+#     name: "aws-credentials"
+#     accessKeyIdKey: "AWS_ACCESS_KEY_ID"
+#     secretAccessKeyKey: "AWS_SECRET_ACCESS_KEY"
+#     regionKey: "AWS_REGION"
+
+# SQS Configuration
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789/s3-events-prod"
+    buckets:
+      - name: "my-production-bucket"
+        prefixes:
+          - "logs/"
+          - "data/"
+      - name: "my-backup-bucket"
+    processUnlistedBuckets: false
+    workerCount: 10
+    maxMessages: 10
+
+# Resource limits for production
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Enable auto-scaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Enable monitoring
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  additionalLabels:
+    release: prometheus
+
+# High availability
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Security (works on any Kubernetes)
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8087
+  egress:
+    - to: []  # Allow all egress (for AWS API calls)
+      ports:
+        - protocol: TCP
+          port: 443  # HTTPS
+
+# Node selection for dedicated monitoring nodes
+nodeSelector:
+  node-type: monitoring
+
+tolerations:
+  - key: "monitoring"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"

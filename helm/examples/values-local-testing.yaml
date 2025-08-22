@@ -1,0 +1,119 @@
+# Local testing configuration for s3-metrics-adapter
+# Based on your specific configuration requirements
+
+# Use your custom image or the latest from Docker Hub
+image:
+  repository: codebyrupinder/s3-metrics-prom-adaptor
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+# Single replica for local testing
+replicaCount: 1
+
+# Service configuration for local access
+service:
+  type: ClusterIP  # Use NodePort if you want external access
+  port: 8087
+  targetPort: 8087
+  # Enable for external Prometheus scraping (Docker Desktop doesn't have Prometheus Operator)
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8087"
+    prometheus.io/path: "/metrics"
+
+# AWS Credentials - use existing secret for local testing
+awsCredentials:
+  existingSecret:
+    name: "aws-credentials"
+    # We'll create this secret manually before deployment
+
+# Your specific application configuration
+config:
+  logging:
+    default: info
+    components:
+      eventparser: info
+      metricsexporter: info
+      sqspoller: info
+    format:
+      timestampFormat: "2006-01-02T15:04:05.000Z07:00"
+      prettyPrint: false
+
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/305018987196/s3-metrics-adapter-dev-s3-event-queue"
+    buckets:
+      - name: "s3-metrics-adapter-dev-test-bucket"
+    processUnlistedBuckets: true
+    workerCount: 5
+    maxMessages: 10
+    waitTime: 20
+
+  metrics:
+    enabled: true
+    types:
+      eventTotal: true
+      objectSize: true
+      userTotal: true
+      ipTotal: true
+      prefixTotal: true
+      prefixDepthTotal: true
+      fileExtensionTotal: true
+      latency: true
+      anomalyDetection: true
+      lifecycleExpiration: true
+      deleteTotal: true
+    prefixDepth: 4
+    objectSizeBuckets:
+      - 1024
+      - 102400
+      - 1048576
+    port: 8087
+
+# Resource limits for local testing (lighter than production)
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+
+# Disable features not needed for local testing
+serviceMonitor:
+  enabled: false  # Docker Desktop doesn't have Prometheus Operator
+
+podMonitor:
+  enabled: false
+
+autoscaling:
+  enabled: false  # Not needed for local testing
+
+podDisruptionBudget:
+  enabled: false
+
+networkPolicy:
+  enabled: false  # Keep networking simple for local testing
+
+ingress:
+  enabled: false
+
+# Security context (works well with Docker Desktop)
+securityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 65532
+  capabilities:
+    drop:
+    - ALL
+  seccompProfile:
+    type: RuntimeDefault
+  readOnlyRootFilesystem: true
+
+podSecurityContext:
+  fsGroup: 65532
+  runAsGroup: 65532
+  runAsNonRoot: true
+  runAsUser: 65532
+  seccompProfile:
+    type: RuntimeDefault

@@ -1,0 +1,305 @@
+# Default values for s3-metrics-adapter
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: codebyrupinder/s3-metrics-adapter
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "1.0.1"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations:
+    # For AWS EKS with IAM roles for service accounts (IRSA)
+    eks.amazonaws.com/role-arn: ""
+    # For GKE with Workload Identity
+    iam.gke.io/gcp-service-account: ""
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+  # For external Prometheus pod-level scraping (no Operator required):
+  # prometheus.io/scrape: "true"
+  # prometheus.io/port: "8087"
+  # prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  fsGroup: 65532
+  runAsGroup: 65532
+  runAsNonRoot: true
+  runAsUser: 65532
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+service:
+  type: ClusterIP
+  port: 8087
+  targetPort: 8087
+  # Annotations for external Prometheus scraping (no Operator required)
+  annotations: {}
+    # Enable these annotations for external Prometheus scraping:
+    # prometheus.io/scrape: "true"
+    # prometheus.io/port: "8087"
+    # prometheus.io/path: "/metrics"
+    # prometheus.io/scheme: "http"
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: s3-exporter.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: s3-exporter-tls
+  #    hosts:
+  #      - s3-exporter.local
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Configuration for the s3-metrics-adapter
+config:
+  logging:
+    default: info
+    components:
+      eventparser: info
+      metricsexporter: info
+      sqspoller: info
+    format:
+      timestampFormat: "2006-01-02T15:04:05.000Z07:00"
+      prettyPrint: false
+
+  sqs:
+    queues: []  # Add your SQS queue URLs here
+    # Example:
+    # - https://sqs.us-west-2.amazonaws.com/123456789/my-s3-events-queue
+    buckets: []  # Add your bucket configurations here
+    # Example:
+    # - name: my-s3-bucket
+    #   prefixes:
+    #     - logs/
+    #     - data/
+    processUnlistedBuckets: true
+    workerCount: 5
+    maxMessages: 10
+    waitTime: 20
+
+  metrics:
+    enabled: true
+    types:
+      eventTotal: true
+      objectSize: true
+      userTotal: true
+      ipTotal: true
+      prefixTotal: true
+      prefixDepthTotal: true
+      fileExtensionTotal: true
+      latency: true
+      anomalyDetection: true
+      lifecycleExpiration: true
+      deleteTotal: true
+    prefixDepth: 4
+    objectSizeBuckets:
+      - 1024
+      - 102400
+      - 1048576
+      - 10485760
+      - 104857600
+    port: 8087
+
+# AWS Credentials Configuration
+# Choose one of the following methods based on your Kubernetes environment:
+
+# Method 1: Cloud Provider IAM (EKS IRSA, GKE Workload Identity) - Managed Kubernetes
+# Configure serviceAccount.annotations above (eks.amazonaws.com/role-arn or iam.gke.io/gcp-service-account)
+
+# Method 2: AWS Credentials Secret - Self-managed Kubernetes, on-premises, bare metal
+awsCredentials:
+  # Set to true to create a secret with AWS credentials
+  create: false
+  # Name of the secret (will be auto-generated if empty)
+  secretName: ""
+  # AWS credentials - use only for initial setup, prefer external secret management
+  accessKeyId: ""  # Set via --set-string awsCredentials.accessKeyId=YOUR_ACCESS_KEY
+  secretAccessKey: ""  # Set via --set-string awsCredentials.secretAccessKey=YOUR_SECRET_KEY
+  sessionToken: ""  # Optional, for temporary credentials
+  region: "us-west-2"
+  
+  # Alternative: reference existing secret
+  existingSecret:
+    # Name of existing secret containing AWS credentials
+    name: ""
+    # Keys in the secret (defaults shown)
+    accessKeyIdKey: "AWS_ACCESS_KEY_ID"
+    secretAccessKeyKey: "AWS_SECRET_ACCESS_KEY"
+    sessionTokenKey: "AWS_SESSION_TOKEN"  # optional
+    regionKey: "AWS_REGION"
+
+# Method 3: Instance Profile - Self-managed Kubernetes on EC2
+# No additional configuration needed, just ensure EC2 instances have proper IAM roles
+
+# Method 4: Custom Environment Variables - Full control
+env: []
+# Example for manual credential configuration:
+# - name: AWS_REGION
+#   value: "us-west-2"
+# - name: AWS_ACCESS_KEY_ID
+#   valueFrom:
+#     secretKeyRef:
+#       name: my-aws-credentials
+#       key: access-key-id
+# - name: AWS_SECRET_ACCESS_KEY
+#   valueFrom:
+#     secretKeyRef:
+#       name: my-aws-credentials
+#       key: secret-access-key
+
+# Environment variables from existing secrets/configmaps
+envFrom: []
+# Example for loading entire secret as environment variables:
+# - secretRef:
+#     name: aws-credentials
+# - configMapRef:
+#     name: app-config
+
+# Volumes and volume mounts
+volumes: []
+# Example:
+# - name: aws-credentials
+#   secret:
+#     secretName: aws-credentials
+
+volumeMounts: []
+# Example:
+# - name: aws-credentials
+#   mountPath: /etc/aws
+#   readOnly: true
+
+# Liveness and readiness probes
+livenessProbe:
+  httpGet:
+    path: /metrics
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /metrics
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Prometheus Monitoring Configuration
+# Choose the appropriate monitoring method based on your setup:
+# 1. serviceMonitor: For clusters with Prometheus Operator installed
+# 2. podMonitor: Alternative to serviceMonitor (Prometheus Operator)
+# 3. service.annotations: For external Prometheus scraping
+# 4. pod.annotations: For external Prometheus pod-level scraping
+
+# Prometheus ServiceMonitor (requires Prometheus Operator)
+serviceMonitor:
+  # Enable only if Prometheus Operator is installed in your cluster
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  namespace: ""  # Leave empty to use release namespace
+  additionalLabels: {}
+  # Example: additionalLabels: { release: prometheus }
+  metricRelabelings: []
+  relabelings: []
+
+# Prometheus PodMonitor (requires Prometheus Operator)
+podMonitor:
+  # Alternative to ServiceMonitor, enables pod-level monitoring
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  namespace: ""
+  additionalLabels: {}
+  metricRelabelings: []
+  relabelings: []
+
+# Pod Disruption Budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Network Policy
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+
+# Init containers
+initContainers: []
+
+# Additional containers
+sidecars: []
+
+# Pod priority class
+priorityClassName: ""
+
+# Runtime class
+runtimeClassName: ""
+
+# DNS policy
+dnsPolicy: ClusterFirst
+
+# Restart policy
+restartPolicy: Always
+
+# Termination grace period
+terminationGracePeriodSeconds: 30

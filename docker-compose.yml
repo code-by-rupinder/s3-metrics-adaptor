@@ -1,0 +1,80 @@
+version: "3.8"
+
+services:
+  s3-metrics-adapter:
+    image: codebyrupinder/s3-metrics-adapter:latest
+    container_name: s3-metrics-adapter
+    ports:
+      - "8087:8087"
+    volumes:
+      # Mount your custom config file here
+      - ./config.yaml:/app/config.yaml:ro
+      # Mount AWS credentials (optional - can use environment variables instead)
+      # - ~/.aws:/home/nonroot/.aws:ro
+    environment:
+      # AWS Configuration (alternative to mounting ~/.aws)
+      # - AWS_ACCESS_KEY_ID=your-access-key
+      # - AWS_SECRET_ACCESS_KEY=your-secret-key
+      - AWS_REGION=us-west-2
+
+      # Application Configuration (overrides config.yaml values)
+      # - SQS_QUEUE_URL=https://sqs.us-west-2.amazonaws.com/123456789/your-queue
+      # - S3_BUCKET_NAME=your-bucket-name
+      # - METRICS_PORT=8087
+      # - LOG_LEVEL=info
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:8087/metrics || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/etc/prometheus/console_libraries"
+      - "--web.console.templates=/etc/prometheus/consoles"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
+    depends_on:
+      - s3-metrics-adapter
+
+  # Optional: Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      # Mount dashboards directory if you have custom dashboards
+      # - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      # - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  default:
+    name: s3-monitoring

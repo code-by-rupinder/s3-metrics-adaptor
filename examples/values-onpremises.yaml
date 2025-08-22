@@ -1,0 +1,77 @@
+# values-onpremises.yaml
+# Example configuration for on-premises Kubernetes clusters
+# Suitable for air-gapped environments with external AWS access
+
+replicaCount: 1
+
+image:
+  repository: codebyrupinder/s3_metrics_adapter
+  tag: "1.0.1"
+  pullPolicy: IfNotPresent
+
+# Use existing secret created by external secret management system
+awsCredentials:
+  existingSecret:
+    name: "aws-credentials"
+    accessKeyIdKey: "access-key-id"
+    secretAccessKeyKey: "secret-access-key"
+    regionKey: "region"
+
+# Alternative: Manual environment variable configuration
+# env:
+#   - name: AWS_ACCESS_KEY_ID
+#     valueFrom:
+#       secretKeyRef:
+#         name: aws-credentials
+#         key: access-key-id
+#   - name: AWS_SECRET_ACCESS_KEY
+#     valueFrom:
+#       secretKeyRef:
+#         name: aws-credentials
+#         key: secret-access-key
+#   - name: AWS_REGION
+#     value: "us-west-2"
+
+config:
+  logging:
+    default: info
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789/onprem-events"
+    processUnlistedBuckets: true
+    workerCount: 3
+
+# Conservative resource limits for on-premises
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 64Mi
+
+# Basic monitoring without Prometheus Operator
+service:
+  type: ClusterIP
+  port: 8087
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8087"
+    prometheus.io/path: "/metrics"
+
+# No auto-scaling for simple deployments
+autoscaling:
+  enabled: false
+
+# Disable advanced features for simplicity
+serviceMonitor:
+  enabled: false
+
+podMonitor:
+  enabled: false
+
+networkPolicy:
+  enabled: false
+
+podDisruptionBudget:
+  enabled: false

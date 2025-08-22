@@ -1,0 +1,51 @@
+name: Build and Release Binaries
+
+on:
+  release:
+    types: [published]
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write # Needed for uploading release assets
+
+jobs:
+  build:
+    name: Build and Upload Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        goos: [linux, windows, darwin]
+        goarch: [amd64, arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.6"
+
+      - name: Set version variables
+        id: vars
+        run: |
+          # Extract version from tag, strip leading 'v' if present
+          RAW_VERSION="${GITHUB_REF##*/}"
+          VERSION=${RAW_VERSION#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> $GITHUB_OUTPUT
+          echo "git_commit=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "git_branch=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build binary with version info
+        run: |
+          mkdir -p dist
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -ldflags "-X 'main.Version=${{ steps.vars.outputs.version }}' -X 'main.BuildTime=${{ steps.vars.outputs.build_time }}' -X 'main.GitCommit=${{ steps.vars.outputs.git_commit }}' -X 'main.GitBranch=${{ steps.vars.outputs.git_branch }}'" -o dist/s3_metrics_adapter-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/main.go
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/s3_metrics_adapter-${{ matrix.goos }}-${{ matrix.goarch }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
