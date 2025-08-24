@@ -8,7 +8,7 @@ The S3 Event Exporter is a Prometheus exporter that monitors AWS S3 events throu
 
 ## Prerequisites
 
-- Kubernetes 1.19+
+- Kubernetes 1.21+
 - Helm 3.0+
 - AWS credentials configured (IAM roles, access keys, or IRSA)
 - SQS q## Support
@@ -16,7 +16,7 @@ The S3 Event Exporter is a Prometheus exporter that monitors AWS S3 events throu
 - **GitHub Issues**: [Create an issue](https://github.com/code-by-rupinder/s3-metrics-adaptor/issues)
 
 - **AWS Credentials Guide**: [Detailed credential configuration](../../docs/aws-credentials-guide.md)
-- **Docker Hub**: [codebyrupinder/s3_metrics_adapter](https://hub.docker.com/r/codebyrupinder/s3_metrics_adapter)
+- **Docker Hub**: [codebyrupinder/s3_metrics_adapter](https://hub.docker.com/r/codebyrupinder/s3-metrics-prom-adaptor)
 
 ## Quick Reference by Environment
 

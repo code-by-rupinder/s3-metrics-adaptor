@@ -85,8 +85,3 @@
 {{- else }}
    ⚠️  No SQS queues configured. Update values.yaml with your queue URLs.
 {{- end }}
-
-📚 For complete documentation, see:
-   - Deployment guide: https://github.com/codebyrupinder/s3-event-exporter/blob/main/helm/DEPLOYMENT.md
-   - Monitoring setup: https://github.com/codebyrupinder/s3-event-exporter/blob/main/helm/MONITORING.md
-   - GitHub Pages registry: https://github.com/codebyrupinder/s3-event-exporter/blob/main/helm/GITHUB-PAGES-SETUP.md
