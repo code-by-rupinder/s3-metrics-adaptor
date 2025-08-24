@@ -25,28 +25,15 @@ The S3 Event Exporter is a Kubernetes-native application that processes S3 event
 
 ```bash
 # Add the Helm repository
-helm repo add s3-metrics-adapter https://codebyrupinder.github.io/s3-metrics-adapter/
+helm repo add helm-charts https://code-by-rupinder.github.io/helm-charts/
 helm repo update
 
 # Install the chart
-helm install my-s3-exporter s3-metrics-adapter/s3-metrics-adapter \
+helm install my-s3-exporter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   --namespace monitoring \
   --create-namespace \
-  --set config.sqs.queues[0]="https://sqs.us-west-2.amazonaws.com/123456789/your-queue"
-```
-
-### Install from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/codebyrupinder/s3_metrics_adapter.git
-cd s3-metrics-adapter
-
-# Install the chart
-helm install s3-metrics-adapter ./helm/s3_metrics_adapter \
-  --namespace monitoring \
-  --create-namespace \
-  --set config.sqs.queues[0]="https://sqs.us-west-2.amazonaws.com/123456789/your-queue"
+  --set 'config.sqs.queues[0]=https://sqs.us-west-2.amazonaws.com/123456789/your-queue'
 ```
 
 ## Chart Information
@@ -188,7 +175,8 @@ eksctl create iamserviceaccount \
   --approve
 
 # Install chart
-helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm install s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   --set serviceAccount.annotations."eks\.amazonaws\.com/role-arn"="arn:aws:iam::ACCOUNT:role/S3EventExporterRole" \
   --namespace monitoring \
   --create-namespace
@@ -197,7 +185,8 @@ helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
 ### 2. Self-managed Kubernetes (EC2 Instance Profile)
 
 ```bash
-helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm install s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   -f helm/examples/values-ec2-instance-profile.yaml \
   --namespace monitoring \
   --create-namespace
@@ -214,7 +203,8 @@ kubectl create secret generic aws-credentials \
   --namespace monitoring
 
 # Install chart
-helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm install s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   --set awsCredentials.existingSecret.name="aws-credentials" \
   --namespace monitoring \
   --create-namespace
@@ -290,7 +280,8 @@ The S3 Event Exporter supports multiple monitoring approaches:
 If you have Prometheus Operator installed:
 
 ```bash
-helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm install s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   --set serviceMonitor.enabled=true \
   --set serviceMonitor.additionalLabels.release=prometheus \
   --namespace monitoring
@@ -301,7 +292,8 @@ helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
 For standard Prometheus installations:
 
 ```bash
-helm install s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm install s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   --set service.annotations.'prometheus\.io/scrape'=true \
   --set service.annotations.'prometheus\.io/port'=8087 \
   --set service.annotations.'prometheus\.io/path'=/metrics \
@@ -367,7 +359,9 @@ The application exposes metrics on port `8087` at `/metrics` endpoint:
 
 ```bash
 # Validate chart
-helm lint helm/s3_metrics_adapter/
+helm repo add helm-charts https://code-by-rupinder.github.io/helm-charts/
+helm repo update
+helm lint helm-charts/s3-metrics-adapter
 
 # Dry run install
 helm install s3-metrics-adapter helm/s3_metrics_adapter/ --dry-run --debug
@@ -388,11 +382,13 @@ helm test s3-metrics-adapter -n monitoring
 helm repo update
 
 # Upgrade to latest version
-helm upgrade s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm upgrade s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   --namespace monitoring
 
 # Upgrade with new values
-helm upgrade s3-metrics-adapter s3-metrics-adapter/s3-metrics-adapter \
+helm upgrade s3-metrics-adapter helm-charts/s3-metrics-adapter \
+  --version 1.0.0 \
   -f new-values.yaml \
   --namespace monitoring
 ```

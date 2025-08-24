@@ -59,7 +59,7 @@ curl http://localhost:8087/metrics
 
 ```bash
 # Download for your platform
-curl -LO https://github.com/codebyrupinder/s3-metrics-adapter/releases/latest/download/s3_metrics_adapter-linux-amd64
+curl -LO https://github.com/code-by-rupinder/s3-metrics-adaptor/releases/latest/download/s3_metrics_adapter-linux-amd64
 chmod +x s3_metrics_adapter-linux-amd64
 
 # Run with config
@@ -69,7 +69,7 @@ chmod +x s3_metrics_adapter-linux-amd64
 ### Docker Compose (Full Stack)
 
 ```bash
-git clone https://github.com/codebyrupinder/s3-metrics-adapter.git
+git clone https://github.com/code-by-rupinder/s3-metrics-adaptor.git
 cd s3-metrics-adapter
 docker-compose up -d
 
@@ -179,7 +179,7 @@ spec:
     spec:
       containers:
       - name: s3-metrics-adapter
-        image: codebyrupinder/s3-metrics-adapter:latest
+        image: codebyrupinder/s3-metrics-prom-adaptor:latest
         ports:
         - containerPort: 8087
         resources:
@@ -281,7 +281,7 @@ docker logs s3-metrics-adapter
 
 # Verify configuration
 docker run --rm -v $(pwd)/config.yaml:/app/config.yaml \
-  codebyrupinder/s3-metrics-adapter:latest -help
+  codebyrupinder/s3-metrics-prom-adaptor:latest -help
 ```
 
 **AWS connection issues:**
@@ -329,10 +329,10 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 ### Development Setup
 
 ```bash
-git clone https://github.com/codebyrupinder/s3-metrics-adapter.git
-cd s3-metrics-adapter
+git clone https://github.com/code-by-rupinder/s3-metrics-adaptor.git
+cd s3-metrics-adaptor
 go mod download
-go build -o s3-metrics-adapter ./cmd
+go build -o s3-metrics-adaptor ./cmd
 ```
 
 ### Running Tests
@@ -353,8 +353,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/codebyrupinder/s3-metrics-adapter/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/codebyrupinder/s3-metrics-adapter/discussions)
+- **Issues**: [GitHub Issues](https://github.com/code-by-rupinder/s3-metrics-adaptor/issues)
 - **Security**: Please report security issues privately via email
 
 ## 🏆 Acknowledgments
