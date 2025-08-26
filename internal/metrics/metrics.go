@@ -19,7 +19,6 @@ type Metrics struct {
 	config             *config.Config
 	eventTotal         *prometheus.CounterVec
 	objectSize         *prometheus.HistogramVec
-	userTotal          *prometheus.CounterVec
 	ipTotal            *prometheus.CounterVec
 	prefixTotal        *prometheus.CounterVec
 	prefixDepthTotal   *prometheus.CounterVec
@@ -58,16 +57,6 @@ func (m *Metrics) initializeMetric(metricType string) {
 			[]string{"bucket", "prefix"},
 		)
 		prometheus.MustRegister(m.objectSize)
-
-	case "userTotal":
-		m.userTotal = prometheus.NewCounterVec(
-			prometheus.CounterOpts{
-				Name: "s3_event_user_total",
-				Help: "Total number of S3 events by user",
-			},
-			[]string{"user"},
-		)
-		prometheus.MustRegister(m.userTotal)
 
 	case "ipTotal":
 		m.ipTotal = prometheus.NewCounterVec(
@@ -178,7 +167,6 @@ func initializeEnabledMetrics(metrics *Metrics, cfg *config.Config) {
 	metricTypes := map[string]bool{
 		"eventTotal":         metricsConfig.EventTotal,
 		"objectSize":         metricsConfig.ObjectSize,
-		"userTotal":          metricsConfig.UserTotal,
 		"ipTotal":            metricsConfig.IPTotal,
 		"prefixTotal":        metricsConfig.PrefixTotal,
 		"prefixDepthTotal":   metricsConfig.PrefixDepthTotal,
@@ -210,6 +198,7 @@ func initializeEnabledMetrics(metrics *Metrics, cfg *config.Config) {
 }
 
 // updateBaseMetrics updates the basic metrics (event total, object size, user total, IP total)
+// updateBaseMetrics updates the basic metrics (event total, object size, IP total)
 func (m *Metrics) updateBaseMetrics(event *ParsedEvent, prefix string) {
 	if m.eventTotal != nil {
 		// Split event type into main type and subtype (e.g., "Object Created.Put" -> "Object Created" and "Put")
@@ -231,21 +220,6 @@ func (m *Metrics) updateBaseMetrics(event *ParsedEvent, prefix string) {
 			size = float64(event.Size)
 		}
 		m.objectSize.WithLabelValues(event.BucketName, prefix).Observe(size)
-	}
-
-	// Track user identity, handling both IAM users and system operations
-	if m.userTotal != nil {
-		var userType string
-		switch event.RequesterID {
-		case "s3.amazonaws.com":
-			userType = "system"
-		case "":
-			userType = "unknown"
-		default:
-			userType = "iam_user"
-		}
-		m.userTotal.WithLabelValues(event.RequesterID).Inc()
-		m.userTotal.WithLabelValues(userType).Inc()
 	}
 
 	// Track source IP, with special handling for system operations

@@ -23,16 +23,6 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
 - **Buckets**: Configurable, defaults to exponential buckets from 1KB to 16TB
 - **Note**: Only tracks size for "Object Created" events; other events record 0
 
-### 3. User Total (`s3_event_user_total`)
-- **Type**: Counter
-- **Description**: Total number of S3 events by user identity
-- **Labels**:
-  - `user`: User identifier or type
-- **Special Values**:
-  - `system`: For events initiated by `s3.amazonaws.com`
-  - `unknown`: For events with empty requester ID
-  - `iam_user`: For regular IAM user events
-  - Actual requester ID for identified users
 
 ### 4. IP Total (`s3_event_ip_total`)
 - **Type**: Counter
@@ -118,7 +108,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: true
     ipTotal: true
     prefixTotal: true
     prefixDepthTotal: true
@@ -147,7 +136,6 @@ The hierarchical path depth can be configured via `config.Metrics.PrefixDepth` t
 ### Core Event Metrics
 - Event Total
 - Object Size
-- User Total
 - IP Total
 
 ### Organization Metrics

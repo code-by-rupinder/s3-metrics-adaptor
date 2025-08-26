@@ -1,13 +1,13 @@
 # S3 Metrics Adapter
 
-[![Docker Hub](https://img.shields.io/docker/v/codebyrupinder/s3-metrics-adapter?label=Docker%20Hub)](https://hub.docker.com/r/codebyrupinder/s3-metrics-adapter)
-[![Go Report Card](https://goreportcard.com/badge/github.com/codebyrupinder/s3-metrics-adapter)](https://goreportcard.com/report/github.com/codebyrupinder/s3-metrics-adapter)
+[![Docker Hub](https://img.shields.io/docker/v/codebyrupinder/s3-metrics-prom-adaptor?label=Docker%20Hub)](https://hub.docker.com/r/codebyrupinder/s3-metrics-prom-adaptor)
+[![Go Report Card](https://goreportcard.com/badge/github.com/codebyrupinder/s3-metrics-adaptor)](https://goreportcard.com/report/github.com/codebyrupinder/s3-metrics-adaptor)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Release](https://img.shields.io/github/release/codebyrupinder/s3-metrics-adapter.svg)](https://github.com/codebyrupinder/s3-metrics-adapter/releases/latest)
+[![Release](https://img.shields.io/github/release/code-by-rupinder/s3-metrics-adaptor.svg)](https://github.com/code-by-rupinder/s3-metrics-adaptor/releases/latest)
 
 A high-performance Prometheus metrics adapter that transforms Amazon S3 events from SQS queues into comprehensive monitoring metrics. Get deep insights into your S3 bucket activities, access patterns, and operational health.
 
-## 🚀 Key Features
+## Key Features
 
 - **Real-time S3 Event Processing** - Convert S3 events from SQS into Prometheus metrics
 - **Comprehensive Metrics** - 12+ metric types covering events, sizes, users, IPs, and anomalies
@@ -17,13 +17,12 @@ A high-performance Prometheus metrics adapter that transforms Amazon S3 events f
 - **Security First** - Distroless container images, non-root execution, minimal attack surface
 - **Multi-deployment Options** - Docker, Kubernetes, binary, or source deployment
 
-## 📊 Available Metrics
+## Available Metrics
 
 | Metric | Type | Description |
 |--------|------|-------------|
 | `s3_event_total` | Counter | Total S3 events by type and subtype |
 | `s3_event_object_size_bytes` | Histogram | Object size distribution |
-| `s3_event_user_total` | Counter | Events by user identity |
 | `s3_event_ip_total` | Counter | Events by source IP |
 | `s3_event_prefix_total` | Counter | Events by object prefix |
 | `s3_events_hierarchical_path_total` | Counter | Events by hierarchical path depth |
@@ -36,7 +35,7 @@ A high-performance Prometheus metrics adapter that transforms Amazon S3 events f
 
 [📖 Complete Metrics Reference](./docs/METRICS_REFERENCE.md)
 
-## 🏃‍♂️ Quick Start
+## Quick Start
 
 ### Docker (Recommended)
 
@@ -49,7 +48,7 @@ docker run -d \
   -e AWS_REGION=us-west-2 \
   -e AWS_ACCESS_KEY_ID=your-key \
   -e AWS_SECRET_ACCESS_KEY=your-secret \
-  codebyrupinder/s3-metrics-adapter:latest
+  codebyrupinder/s3-metrics-prom-adaptor:latest
 
 # Check metrics
 curl http://localhost:8087/metrics
@@ -79,7 +78,7 @@ docker-compose up -d
 # Grafana: http://localhost:3000 (admin/admin)
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 Create a `config.yaml` file:
 
@@ -100,7 +99,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: true
     ipTotal: true
     prefixTotal: true
     fileExtensionTotal: true
@@ -116,7 +114,7 @@ logging:
   default: info
 ```
 
-## 📚 Documentation
+## Documentation
 
 | Guide | Description |
 |-------|-------------|
@@ -126,7 +124,7 @@ logging:
 | [Metrics Reference](./docs/METRICS_REFERENCE.md) | Complete metrics documentation |
 | [Sample Grafana Dashboard](./docs/grafana-dashboard-sample.json) | Ready-to-import dashboard |
 
-## 🏗️ Prerequisites
+## Prerequisites
 
 ### AWS Setup Required
 
@@ -158,7 +156,7 @@ logging:
 - **Network**: Access to AWS SQS endpoints
 - **Storage**: 100MB for logs and temporary files
 
-## 🔧 Advanced Usage
+## Advanced Usage
 
 ### Kubernetes Deployment
 
@@ -179,7 +177,7 @@ spec:
     spec:
       containers:
       - name: s3-metrics-adapter
-        image: codebyrupinder/s3-metrics-prom-adaptor:latest
+  image: codebyrupinder/s3-metrics-prom-adaptor:latest
         ports:
         - containerPort: 8087
         resources:
@@ -225,7 +223,7 @@ sqs:
     # Add more regions/queues as needed
 ```
 
-## 📈 Monitoring Examples
+## Monitoring Examples
 
 ### Prometheus Queries
 
@@ -262,7 +260,7 @@ groups:
           description: "High processing latency: {{ $value }}s"
 ```
 
-## 🛡️ Security
+## Security
 
 - **Distroless Images**: Minimal attack surface with no shell or package manager
 - **Non-root Execution**: Container runs as non-root user
@@ -270,7 +268,7 @@ groups:
 - **Network Security**: Configurable resource limits and network policies
 - **Read-only Filesystem**: Compatible with read-only root filesystems
 
-## 🔍 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -282,7 +280,6 @@ docker logs s3-metrics-adapter
 # Verify configuration
 docker run --rm -v $(pwd)/config.yaml:/app/config.yaml \
   codebyrupinder/s3-metrics-prom-adaptor:latest -help
-```
 
 **AWS connection issues:**
 ```bash
@@ -314,7 +311,7 @@ logging:
     sqspoller: debug
 ```
 
-## 🚀 Performance
+## Performance
 
 - **Throughput**: 1000+ events/second
 - **Memory**: ~50MB runtime usage
@@ -322,7 +319,7 @@ logging:
 - **Startup**: <5 second container startup
 - **Image Size**: 14.5MB (distroless)
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
@@ -347,22 +344,22 @@ go test ./...
 ./docker-build.sh -v 1.0.0
 ```
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🆘 Support
+## Support
 
 - **Issues**: [GitHub Issues](https://github.com/code-by-rupinder/s3-metrics-adaptor/issues)
 - **Security**: Please report security issues privately via email
 
-## 🏆 Acknowledgments
+## Acknowledgments
 
 - AWS SDK for Go team
 - Prometheus Go client library
 - All contributors and users of this project
 
-## 🔗 Related Projects
+## Related Projects
 
 - [Prometheus](https://prometheus.io/) - Metrics collection
 - [Grafana](https://grafana.com/) - Metrics visualization  
@@ -371,4 +368,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Star this project ⭐ if it helps you monitor your S3 infrastructure!**
+**Star this project if it helps you monitor your S3 infrastructure!**

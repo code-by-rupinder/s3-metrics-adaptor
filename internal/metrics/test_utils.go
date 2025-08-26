@@ -46,7 +46,6 @@ func createTestConfig() *config.Config {
 			Types   struct {
 				EventTotal          bool `mapstructure:"eventTotal"`
 				ObjectSize          bool `mapstructure:"objectSize"`
-				UserTotal           bool `mapstructure:"userTotal"`
 				IPTotal             bool `mapstructure:"ipTotal"`
 				PrefixTotal         bool `mapstructure:"prefixTotal"`
 				PrefixDepthTotal    bool `mapstructure:"prefixDepthTotal"`
@@ -64,7 +63,6 @@ func createTestConfig() *config.Config {
 			Types: struct {
 				EventTotal          bool `mapstructure:"eventTotal"`
 				ObjectSize          bool `mapstructure:"objectSize"`
-				UserTotal           bool `mapstructure:"userTotal"`
 				IPTotal             bool `mapstructure:"ipTotal"`
 				PrefixTotal         bool `mapstructure:"prefixTotal"`
 				PrefixDepthTotal    bool `mapstructure:"prefixDepthTotal"`
@@ -76,7 +74,6 @@ func createTestConfig() *config.Config {
 			}{
 				EventTotal:          true,
 				ObjectSize:          true,
-				UserTotal:           true,
 				IPTotal:             true,
 				PrefixTotal:         true,
 				PrefixDepthTotal:    true,
@@ -130,7 +127,6 @@ func resetMetrics(m *Metrics) {
 	metricsToReset := []prometheus.Collector{
 		m.eventTotal,
 		m.objectSize,
-		m.userTotal,
 		m.ipTotal,
 		m.prefixTotal,
 		m.prefixDepthTotal,

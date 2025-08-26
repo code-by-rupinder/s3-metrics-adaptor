@@ -55,7 +55,6 @@ var (
 	metricsPrefixDepth              = flag.Int("metrics.prefixDepth", 0, "Prefix depth for hierarchical tracking (0 uses config file)")
 	metricsTypesEventTotal          = flag.String("metrics.types.eventTotal", "", "Enable event total metrics (true/false)")
 	metricsTypesObjectSize          = flag.String("metrics.types.objectSize", "", "Enable object size metrics (true/false)")
-	metricsTypesUserTotal           = flag.String("metrics.types.userTotal", "", "Enable user total metrics (true/false)")
 	metricsTypesIPTotal             = flag.String("metrics.types.ipTotal", "", "Enable IP total metrics (true/false)")
 	metricsTypesPrefixTotal         = flag.String("metrics.types.prefixTotal", "", "Enable prefix total metrics (true/false)")
 	metricsTypesPrefixDepthTotal    = flag.String("metrics.types.prefixDepthTotal", "", "Enable prefix depth metrics (true/false)")
@@ -215,9 +214,6 @@ func main() {
 	}
 	if objectSize, isSet := parseBool(*metricsTypesObjectSize); isSet {
 		cfg.Metrics.Types.ObjectSize = objectSize
-	}
-	if userTotal, isSet := parseBool(*metricsTypesUserTotal); isSet {
-		cfg.Metrics.Types.UserTotal = userTotal
 	}
 	if ipTotal, isSet := parseBool(*metricsTypesIPTotal); isSet {
 		cfg.Metrics.Types.IPTotal = ipTotal

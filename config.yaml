@@ -10,20 +10,27 @@ logging:
 
 sqs:
   queues:
-    - https://sqs.us-west-2.amazonaws.com/305018987196/s3-metrics-adapter-dev-s3-event-queue
+    - https://sqs.us-east-1.amazonaws.com/305018987196/s3event-test-sqs
+    - https://sqs.us-east-2.amazonaws.com/305018987196/s3event-test-ohio-sqs
   buckets:
-    - name: s3-metrics-adapter-dev-test-bucket
-  processUnlistedBuckets:  true 
+    - name: s3event-test-s3
+      prefix:
+        - "logs/test"
+        - "prod"
+        - "logs/prod"
+    - name: s3event-test-ohio-s3
+      prefix:
+        - "logs/prod"
+  processUnlistedBuckets:  true
   workerCount: 5    # Optional, defaults to 5
   maxMessages: 10   # Optional, defaults to 10
-  waitTime: 20      # Optional, defaults to 20
+  waitTime: 2      # Optional, defaults to 20
 
 metrics:
   enabled: true
   types:
     eventTotal: true
     objectSize: true
-    userTotal: true
     ipTotal: true
     prefixTotal: true     # Enable this to track object metrics
     prefixDepthTotal: true

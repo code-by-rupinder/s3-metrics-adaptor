@@ -19,9 +19,6 @@ func TestInitialize(t *testing.T) {
 	if metrics.objectSize == nil {
 		t.Errorf(errMetricNotInit, "objectSize")
 	}
-	if metrics.userTotal == nil {
-		t.Errorf(errMetricNotInit, "userTotal")
-	}
 	if metrics.ipTotal == nil {
 		t.Errorf(errMetricNotInit, "ipTotal")
 	}

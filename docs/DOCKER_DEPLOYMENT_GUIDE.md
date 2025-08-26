@@ -110,7 +110,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: true
     ipTotal: true
     prefixTotal: true
     prefixDepthTotal: true
@@ -261,7 +260,6 @@ Access Prometheus metrics at:
 
 - `s3_events_total` - Total number of S3 events processed
 - `s3_object_size_bytes` - Object size distribution
-- `s3_events_by_user_total` - Events grouped by user
 - `s3_events_by_ip_total` - Events grouped by source IP
 - `s3_events_by_prefix_total` - Events grouped by object prefix
 - `s3_processing_latency_seconds` - Event processing latency

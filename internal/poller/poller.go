@@ -29,7 +29,7 @@ type SQSClientInterface interface {
 // Constants for SQS polling
 const (
 	maxMessages     = 10
-	waitTimeSeconds = 20
+	waitTimeSeconds = 2
 	maxRetries      = 3
 	backoffBase     = 2 * time.Second
 )
@@ -241,15 +241,14 @@ func (p *SQSPoller) processMessage(ctx context.Context, client SQSClientInterfac
 		return fmt.Errorf("failed to parse message: %w", err)
 	}
 
-	// Check if bucket and prefix are allowed
-	prefix := getPrefix(parsedEvent.ObjectKey)
+	// Check if bucket and prefix are allowed using the full object key
 	logger.Debug(logger.LogContext{
 		Component: "sqspoller",
 		TraceID:   parsedEvent.RequestID,
-	}, fmt.Sprintf("Checking allowance for bucket=%s prefix=%s key=%s",
-		parsedEvent.BucketName, prefix, parsedEvent.ObjectKey))
+	}, fmt.Sprintf("Checking allowance for bucket=%s key=%s",
+		parsedEvent.BucketName, parsedEvent.ObjectKey))
 
-	if !p.config.IsAllowedBucketAndPrefix(parsedEvent.BucketName, prefix) {
+	if !p.config.IsAllowedBucketAndPrefix(parsedEvent.BucketName, parsedEvent.ObjectKey) {
 		logger.Debug(logger.LogContext{
 			Component: "sqspoller",
 			TraceID:   parsedEvent.RequestID,
@@ -273,7 +272,10 @@ func (p *SQSPoller) processMessage(ctx context.Context, client SQSClientInterfac
 	}, fmt.Sprintf("Processing allowed event: %s/%s", parsedEvent.BucketName, parsedEvent.ObjectKey))
 
 	// Update metrics
-	metrics.GetMetrics().UpdateMetrics(parsedEvent)
+	m := metrics.GetMetrics()
+	if m != nil {
+		m.UpdateMetrics(parsedEvent)
+	}
 
 	// Log event details
 	parsedEvent.LogEventDetails()

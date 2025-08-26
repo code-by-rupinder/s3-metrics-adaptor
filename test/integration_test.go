@@ -208,7 +208,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: true
     ipTotal: true
     prefixTotal: true
     prefixDepthTotal: true
@@ -448,7 +447,6 @@ func TestMetricsEndToEnd(t *testing.T) {
 	assert.Contains(t, bodyStr, "s3_event_object_size_bytes")
 	assert.Contains(t, bodyStr, "s3_event_latency_seconds")
 	assert.Contains(t, bodyStr, "s3_event_ip_total")
-	assert.Contains(t, bodyStr, "s3_event_user_total")
 
 	// Verify specific metric values exist
 	assert.Contains(t, bodyStr, `bucket="`+testBucketName+`"`)
@@ -512,7 +510,6 @@ func createTestConfig() *config.Config {
 			Types   struct {
 				EventTotal          bool `mapstructure:"eventTotal"`
 				ObjectSize          bool `mapstructure:"objectSize"`
-				UserTotal           bool `mapstructure:"userTotal"`
 				IPTotal             bool `mapstructure:"ipTotal"`
 				PrefixTotal         bool `mapstructure:"prefixTotal"`
 				PrefixDepthTotal    bool `mapstructure:"prefixDepthTotal"`
@@ -530,7 +527,6 @@ func createTestConfig() *config.Config {
 			Types: struct {
 				EventTotal          bool `mapstructure:"eventTotal"`
 				ObjectSize          bool `mapstructure:"objectSize"`
-				UserTotal           bool `mapstructure:"userTotal"`
 				IPTotal             bool `mapstructure:"ipTotal"`
 				PrefixTotal         bool `mapstructure:"prefixTotal"`
 				PrefixDepthTotal    bool `mapstructure:"prefixDepthTotal"`
@@ -542,7 +538,6 @@ func createTestConfig() *config.Config {
 			}{
 				EventTotal:          true,
 				ObjectSize:          true,
-				UserTotal:           true,
 				IPTotal:             true,
 				PrefixTotal:         true,
 				PrefixDepthTotal:    true,

@@ -60,10 +60,6 @@ func verifyMetricsConfig(t *testing.T, cfg *Config) {
 		t.Error("Expected eventTotal metric to be enabled")
 	}
 
-	if cfg.Metrics.Types.UserTotal {
-		t.Error("Expected userTotal metric to be disabled")
-	}
-
 	if !cfg.Metrics.Types.PrefixDepthTotal {
 		t.Error("Expected prefixDepthTotal metric to be enabled")
 	}
@@ -105,7 +101,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: false
     ipTotal: true
     prefixTotal: true
     prefixDepthTotal: true
@@ -196,7 +191,6 @@ func TestValidateConfig(t *testing.T) {
 					Types   struct {
 						EventTotal          bool `mapstructure:"eventTotal"`
 						ObjectSize          bool `mapstructure:"objectSize"`
-						UserTotal           bool `mapstructure:"userTotal"`
 						IPTotal             bool `mapstructure:"ipTotal"`
 						PrefixTotal         bool `mapstructure:"prefixTotal"`
 						PrefixDepthTotal    bool `mapstructure:"prefixDepthTotal"`

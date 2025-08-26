@@ -76,7 +76,7 @@ This document explains each configuration parameter available in `config.yaml`, 
 ### `types`
 - **Type:** object
 - **Description:** Enable/disable specific metric types. All are boolean.
-  - `eventTotal`, `objectSize`, `userTotal`, `ipTotal`, `prefixTotal`, `prefixDepthTotal`, `fileExtensionTotal`, `latency`, `anomalyDetection`, `lifecycleExpiration`, `deleteTotal`
+  - `eventTotal`, `objectSize`, `ipTotal`, `prefixTotal`, `prefixDepthTotal`, `fileExtensionTotal`, `latency`, `anomalyDetection`, `lifecycleExpiration`, `deleteTotal`
 - **When to use:** Disable metrics you don't need to reduce resource usage.
 
 ### `prefixDepth`
@@ -150,7 +150,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: true
     ipTotal: true
     prefixTotal: true
     prefixDepthTotal: true

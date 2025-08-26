@@ -247,7 +247,6 @@ metrics:
   types:
     eventTotal: true
     objectSize: true
-    userTotal: false
   objectSizeBuckets:
     - 1024
     - 102400
@@ -272,7 +271,6 @@ metrics:
 		assert.Equal(t, 8087, cfg.Metrics.Port)
 		assert.True(t, cfg.Metrics.Types.EventTotal)
 		assert.True(t, cfg.Metrics.Types.ObjectSize)
-		assert.False(t, cfg.Metrics.Types.UserTotal)
 		assert.Equal(t, []float64{1024, 102400, 1048576}, cfg.Metrics.ObjectSizeBuckets)
 	})
 }

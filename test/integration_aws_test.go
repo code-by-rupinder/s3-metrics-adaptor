@@ -188,9 +188,6 @@ func TestMetricsServerWithRealConfig(t *testing.T) {
 	if cfg.Metrics.Types.ObjectSize {
 		enabled++
 	}
-	if cfg.Metrics.Types.UserTotal {
-		enabled++
-	}
 	if cfg.Metrics.Types.IPTotal {
 		enabled++
 	}

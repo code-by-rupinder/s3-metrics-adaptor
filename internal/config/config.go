@@ -40,7 +40,6 @@ type Config struct {
 		Types   struct {
 			EventTotal          bool `mapstructure:"eventTotal"`
 			ObjectSize          bool `mapstructure:"objectSize"`
-			UserTotal           bool `mapstructure:"userTotal"`
 			IPTotal             bool `mapstructure:"ipTotal"`
 			PrefixTotal         bool `mapstructure:"prefixTotal"`
 			PrefixDepthTotal    bool `mapstructure:"prefixDepthTotal"`

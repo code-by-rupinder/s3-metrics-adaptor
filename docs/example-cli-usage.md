@@ -46,7 +46,6 @@ You can now pass all configuration parameters using dot notation that mirrors yo
 # Metrics types (enable/disable specific metrics)
 --metrics.types.eventTotal true
 --metrics.types.objectSize true
---metrics.types.userTotal true
 --metrics.types.ipTotal true
 --metrics.types.prefixTotal true
 --metrics.types.prefixDepthTotal true
