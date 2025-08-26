@@ -29,7 +29,7 @@ permissions:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: codebyrupinder/s3-metrics-adapter
+  IMAGE_NAME: codebyrupinder/s3-metrics-prom-adaptor
 
 jobs:
   build-and-test:
