@@ -86,7 +86,7 @@ jobs:
             # custom tag from workflow dispatch
             type=raw,value={{inputs.tag}},enable=${{ github.event_name == 'workflow_dispatch' }}
             # commit SHA for unique identification
-            type=sha,prefix={{branch}}-
+            type=sha
           labels: |
             org.opencontainers.image.title=S3 Metrics Adapter
             org.opencontainers.image.description=Converts S3 events from SQS queues into Prometheus metrics
