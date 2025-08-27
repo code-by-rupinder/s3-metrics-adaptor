@@ -1,0 +1,89 @@
+# Example configuration for Prometheus Operator
+# This configuration works with clusters that have the Prometheus Operator installed
+
+# Basic application settings
+replicaCount: 3
+
+image:
+  repository: codebyrupinder/s3-metrics-prom-adaptor
+  tag: "1.0.0"
+
+# Standard service configuration (no special annotations needed)
+service:
+  type: ClusterIP
+  port: 8087
+  targetPort: 8087
+
+# AWS credentials configuration (choose appropriate method)
+serviceAccount:
+  create: true
+  annotations:
+    # Example for EKS IRSA
+    eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT:role/S3EventExporterRole"
+
+# Application configuration
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/ACCOUNT/prod-s3-events"
+    workerCount: 10
+  logging:
+    default: info
+
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Enable Prometheus Operator ServiceMonitor
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+  # Add labels that your Prometheus uses for service discovery
+  additionalLabels:
+    release: prometheus  # Common label for helm-installed Prometheus
+    app: prometheus     # Alternative label
+  # Optional: Custom metric relabeling
+  metricRelabelings: []
+  # Optional: Custom relabeling
+  relabelings: []
+
+# Alternative: Use PodMonitor instead of ServiceMonitor
+podMonitor:
+  enabled: false  # Use either ServiceMonitor OR PodMonitor, not both
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+
+# Production features
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 2
+
+# Security
+networkPolicy:
+  enabled: true
+
+# How to verify ServiceMonitor is discovered by Prometheus:
+# 1. Check if the ServiceMonitor is created:
+#    kubectl get servicemonitor -n monitoring
+#
+# 2. Check Prometheus targets:
+#    Access Prometheus UI -> Status -> Targets
+#    Look for your service in the targets list
+#
+# 3. Verify metrics are being scraped:
+#    Query: up{job="s3-metrics-adapter"}
+#    Should return 1 if scraping is successful

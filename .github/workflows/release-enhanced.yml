@@ -1,0 +1,453 @@
+name: Enhanced Release Pipeline
+
+on:
+  push:
+    tags:
+      - "v*.*.*" # Only trigger on semantic version tags (v1.0.0, v1.2.3, etc.)
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: codebyrupinder/s3-metrics-prom-adaptor
+
+jobs:
+  # =======================================
+  # Pre-Release Validation
+  # =======================================
+  validate:
+    name: 🔍 Pre-Release Validation
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      is_prerelease: ${{ steps.check_prerelease.outputs.is_prerelease }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full git history for changelog generation
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Validate semantic version
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          if [[ ! $VERSION =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?(\+[a-zA-Z0-9]+(\.[a-zA-Z0-9]+)*)?$ ]]; then
+            echo "❌ Invalid semantic version: $VERSION"
+            echo "Expected format: v1.2.3, v1.2.3-alpha.1, v1.2.3+build.1"
+            exit 1
+          fi
+          echo "✅ Valid semantic version: $VERSION"
+
+      - name: Check if prerelease
+        id: check_prerelease
+        run: |
+          VERSION=${{ steps.get_version.outputs.version }}
+          if [[ $VERSION == *"-"* ]]; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "🔄 This is a pre-release version"
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+            echo "🎉 This is a stable release version"
+          fi
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Run comprehensive tests
+        run: |
+          echo "🧪 Running comprehensive test suite..."
+          go test -v -race -coverprofile=coverage.out ./...
+
+          # Check coverage threshold
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print substr($3, 1, length($3)-1)}')
+          echo "📊 Total coverage: $COVERAGE%"
+          if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            echo "❌ Coverage is below 50% ($COVERAGE%)"
+            exit 1
+          fi
+          echo "✅ Coverage meets requirements: $COVERAGE%"
+
+      - name: Print Go version
+        run: go version
+
+      - name: Run gosec security scanner
+        run: |
+          go install github.com/securego/gosec/v2/cmd/gosec@latest
+          gosec ./...
+
+      - name: Lint code
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          args: --timeout=5m
+
+  # =======================================
+  # Multi-Platform Build & Test
+  # =======================================
+  build:
+    name: 🏗️ Build (${{ matrix.goos }}-${{ matrix.goarch }})
+    needs: validate
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux builds
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: linux
+            goarch: arm
+            goarm: "7"
+          # macOS builds
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+          # Windows builds
+          - goos: windows
+            goarch: amd64
+          - goos: windows
+            goarch: arm64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # FIXED: Need full git history for proper Git info
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM: ${{ matrix.goarm }}
+          VERSION: ${{ needs.validate.outputs.version }}
+          CGO_ENABLED: 0
+        run: |
+          # FIXED: Create proper build info (consistent with local builds)
+          BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')  # Use ISO format instead of underscore
+          GIT_COMMIT=$(git rev-parse --short HEAD)    # Use short commit hash
+
+          # FIXED: Handle Git branch for tag builds
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # For tag builds, set to main (or your default branch)
+            GIT_BRANCH="main"
+          else
+            # For branch builds, use the actual branch
+            GIT_BRANCH="${{ github.ref_name }}"
+          fi
+
+          echo "Build info:"
+          echo "  Version: $VERSION"
+          echo "  Build Time: $BUILD_TIME"
+          echo "  Git Commit: $GIT_COMMIT"
+          echo "  Git Branch: $GIT_BRANCH"
+
+          # Set binary name with extension for Windows
+          BINARY_NAME="s3-metrics-adapter"
+          if [ "$GOOS" = "windows" ]; then
+            BINARY_NAME="${BINARY_NAME}.exe"
+          fi
+
+          # Create platform-specific directory
+          OUTPUT_DIR="dist/${GOOS}_${GOARCH}"
+          if [ -n "$GOARM" ]; then
+            OUTPUT_DIR="${OUTPUT_DIR}v${GOARM}"
+          fi
+          mkdir -p $OUTPUT_DIR
+
+          # FIXED: Build with proper ldflags for version info
+          go build \
+            -a -installsuffix cgo \
+            -ldflags="-w -s -X main.Version=${VERSION} -X main.BuildTime=${BUILD_TIME} -X main.GitCommit=${GIT_COMMIT} -X main.GitBranch=${GIT_BRANCH}" \
+            -o "${OUTPUT_DIR}/${BINARY_NAME}" \
+            ./cmd/main.go
+
+          # Create checksum
+          cd $OUTPUT_DIR
+          if command -v sha256sum > /dev/null; then
+            sha256sum $BINARY_NAME > ${BINARY_NAME}.sha256
+          else
+            shasum -a 256 $BINARY_NAME > ${BINARY_NAME}.sha256
+          fi
+
+          echo "✅ Built ${BINARY_NAME} for ${GOOS}/${GOARCH}"
+          ls -la
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.goarm && format('v{0}', matrix.goarm) || '' }}
+          path: dist/
+          retention-days: 7
+
+  # =======================================
+  # Docker Build & Push
+  # =======================================
+  docker:
+    name: 🐳 Docker Build & Push
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # FIXED: Need full git history
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}},enable=${{ !needs.validate.outputs.is_prerelease }}
+            type=raw,value=latest,enable=${{ !needs.validate.outputs.is_prerelease }}
+
+      # FIXED: Added proper build info preparation step
+      - name: Prepare build info
+        id: build_info
+        run: |
+          BUILD_TIME=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+          GIT_COMMIT=$(git rev-parse --short HEAD)
+
+          # Handle Git branch for tag builds (same logic as binary builds)
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # For tag builds, set to main (or your default branch)
+            GIT_BRANCH="main"
+          else
+            # For branch builds, use the actual branch
+            GIT_BRANCH="${{ github.ref_name }}"
+          fi
+
+          echo "build_time=$BUILD_TIME" >> $GITHUB_OUTPUT
+          echo "git_commit=$GIT_COMMIT" >> $GITHUB_OUTPUT  
+          echo "git_branch=$GIT_BRANCH" >> $GITHUB_OUTPUT
+
+          echo "Docker build info:"
+          echo "  Version: ${{ needs.validate.outputs.version }}"
+          echo "  Build Time: $BUILD_TIME"
+          echo "  Git Commit: $GIT_COMMIT"
+          echo "  Git Branch: $GIT_BRANCH"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            VERSION=${{ needs.validate.outputs.version }}
+            BUILD_TIME=${{ steps.build_info.outputs.build_time }}
+            GIT_COMMIT=${{ steps.build_info.outputs.git_commit }}
+            GIT_BRANCH=${{ steps.build_info.outputs.git_branch }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =======================================
+  # Generate Changelog
+  # =======================================
+  changelog:
+    name: 📝 Generate Changelog
+    needs: validate
+    runs-on: ubuntu-latest
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          CURRENT_TAG=${{ needs.validate.outputs.version }}
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -A1 "^${CURRENT_TAG}$" | tail -n1)
+
+          if [ -z "$PREVIOUS_TAG" ] || [ "$PREVIOUS_TAG" = "$CURRENT_TAG" ]; then
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+            echo "📅 First release - comparing against initial commit"
+          else
+            echo "📅 Generating changelog from $PREVIOUS_TAG to $CURRENT_TAG"
+          fi
+
+          # Generate changelog with categorized commits
+          CHANGELOG=$(cat << 'EOF'
+          ## What's Changed
+
+          ### 🚀 Features
+          $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --grep="feat\|feature" || echo "No new features")
+
+          ### 🐛 Bug Fixes
+          $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --grep="fix\|bug" || echo "No bug fixes")
+
+          ### 📈 Improvements
+          $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --grep="improve\|enhance\|refactor" || echo "No improvements")
+
+          ### 🧪 Tests
+          $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --grep="test\|coverage" || echo "No test changes")
+
+          ### 📚 Documentation
+          $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --grep="doc\|readme" || echo "No documentation changes")
+
+          ### 🔧 Other Changes
+          $(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%h)" --invert-grep --grep="feat\|feature\|fix\|bug\|improve\|enhance\|refactor\|test\|coverage\|doc\|readme" || echo "No other changes")
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${CURRENT_TAG}
+          EOF
+          )
+
+          # Save changelog to file and output
+          echo "$CHANGELOG" > CHANGELOG.md
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload changelog
+        uses: actions/upload-artifact@v4
+        with:
+          name: changelog
+          path: CHANGELOG.md
+
+  # =======================================
+  # Create GitHub Release
+  # =======================================
+  release:
+    name: 🎉 Create GitHub Release
+    needs: [validate, build, docker, changelog]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+
+          # Organize binaries
+          for dir in artifacts/binaries-*; do
+            if [ -d "$dir" ] && [ -d "$dir/dist" ]; then
+              platform=$(basename "$dir" | sed 's/binaries-//')
+              cd "$dir/dist"
+              for subdir in */; do
+                if [ -d "$subdir" ]; then
+                  platform_name=$(basename "$subdir")
+                  cd "$subdir"
+                  # Create tar.gz for Unix-like systems, zip for Windows
+                  if [[ $platform_name == *"windows"* ]]; then
+                    zip -r "../../../release-assets/s3-metrics-adapter_${{ needs.validate.outputs.version }}_${platform_name}.zip" .
+                  else
+                    tar -czf "../../../release-assets/s3-metrics-adapter_${{ needs.validate.outputs.version }}_${platform_name}.tar.gz" .
+                  fi
+                  cd ..
+                fi
+              done
+              cd ../../..
+            fi
+          done
+
+          # List all release assets
+          echo "📦 Release assets:"
+          ls -la release-assets/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.validate.outputs.version }}
+          name: Release ${{ needs.validate.outputs.version }}
+          body: ${{ needs.changelog.outputs.changelog }}
+          draft: false
+          prerelease: ${{ needs.validate.outputs.is_prerelease }}
+          files: |
+            release-assets/*
+          generate_release_notes: false # We're providing our own
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # =======================================
+  # Post-Release Notifications
+  # =======================================
+  notify:
+    name: 📢 Post-Release Notifications
+    needs: [validate, release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Release Summary
+        run: |
+          echo "🎉 Release Summary"
+          echo "=================="
+          echo "Version: ${{ needs.validate.outputs.version }}"
+          echo "Type: ${{ needs.validate.outputs.is_prerelease == 'true' && 'Pre-release' || 'Stable Release' }}"
+          echo "Docker Images: docker.io/codebyrupinder/s3-metrics-prom-adaptor:${{ needs.validate.outputs.version }}"
+          echo "Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate.outputs.version }}"
+
+          if [ "${{ needs.release.result }}" = "success" ]; then
+            echo "✅ Release completed successfully!"
+          else
+            echo "❌ Release failed!"
+            exit 1
+          fi
+
+      # Optional: Add Slack/Discord/Teams notifications here
+      # - name: Notify Slack
+      #   if: success()
+      #   uses: 8398a7/action-slack@v3
+      #   with:
+      #     status: success
+      #     text: "🎉 New release ${{ needs.validate.outputs.version }} is available!"
+      #   env:
+      #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

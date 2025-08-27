@@ -1,0 +1,90 @@
+# Example configuration for external Prometheus (no Operator required)
+# This configuration works with standard Prometheus installations that discover
+# services through Kubernetes service discovery and annotations
+
+# Basic application settings
+replicaCount: 2
+
+image:
+  repository: codebyrupinder/s3-metrics-prom-adaptor
+  tag: "1.0.0"
+
+# Configure service annotations for Prometheus scraping
+service:
+  type: ClusterIP
+  port: 8087
+  targetPort: 8087
+  annotations:
+    # These annotations tell external Prometheus to scrape this service
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8087"
+    prometheus.io/path: "/metrics"
+    prometheus.io/scheme: "http"
+
+# Alternative: Configure pod annotations for Prometheus scraping
+# Use this if your Prometheus is configured to discover pods instead of services
+podAnnotations:
+  # prometheus.io/scrape: "true"
+  # prometheus.io/port: "8087"
+  # prometheus.io/path: "/metrics"
+
+# AWS credentials configuration (choose appropriate method)
+awsCredentials:
+  existingSecret:
+    name: "aws-credentials"
+
+# Application configuration
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789/your-queue"
+    workerCount: 5
+  logging:
+    default: info
+
+# Resource configuration
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Disable Prometheus Operator features (not needed for external Prometheus)
+serviceMonitor:
+  enabled: false
+
+podMonitor:
+  enabled: false
+
+# Optional: Enable autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70
+
+# Example Prometheus configuration for scraping this service:
+# prometheus.yml:
+# scrape_configs:
+#   - job_name: 'kubernetes-services'
+#     kubernetes_sd_configs:
+#       - role: service
+#     relabel_configs:
+#       - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+#         action: keep
+#         regex: true
+#       - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scheme]
+#         action: replace
+#         target_label: __scheme__
+#         regex: (https?)
+#       - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+#         action: replace
+#         target_label: __metrics_path__
+#         regex: (.+)
+#       - source_labels: [__address__, __meta_kubernetes_service_annotation_prometheus_io_port]
+#         action: replace
+#         target_label: __address__
+#         regex: ([^:]+)(?::\d+)?;(\d+)
+#         replacement: $1:$2

@@ -1,0 +1,81 @@
+name: Validate Helm Charts
+
+on:
+  push:
+    branches: [main]
+    paths: ["helm/**"]
+  pull_request:
+    paths: ["helm/**"]
+  workflow_dispatch:
+
+jobs:
+  validate-helm-charts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: "latest"
+
+      - name: Validate Charts
+        run: |
+          echo "🔍 Validating Helm charts..."
+          for chart in helm/*/; do
+            if [[ -f "$chart/Chart.yaml" ]]; then
+              chart_name=$(basename "$chart")
+              echo "Validating $chart_name..."
+              
+              # Lint the chart
+              helm lint "$chart"
+              
+              # Test template rendering
+              helm template test-release "$chart" > /dev/null
+              
+              # Show chart info
+              echo "✅ Chart $chart_name is valid"
+              helm show chart "$chart" | grep -E '^(name|version|appVersion):'
+            fi
+          done
+
+      - name: Package Charts for Testing
+        run: |
+          echo "📦 Test packaging Helm charts..."
+          mkdir -p .test-packages
+
+          for chart in helm/*/; do
+            if [[ -f "$chart/Chart.yaml" ]]; then
+              chart_name=$(basename "$chart")
+              echo "Packaging $chart_name for testing..."
+              helm package "$chart" --destination .test-packages
+            fi
+          done
+
+          echo "📋 Packaged charts:"
+          ls -la .test-packages/
+
+      - name: Validation Summary
+        run: |
+          echo "## ✅ Helm Chart Validation Complete!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Validated Charts" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          for chart in helm/*/; do
+            if [[ -f "$chart/Chart.yaml" ]]; then
+              CHART_NAME=$(basename "$chart")
+              CHART_VERSION=$(helm show chart "$chart" | grep '^version:' | awk '{print $2}')
+              APP_VERSION=$(helm show chart "$chart" | grep '^appVersion:' | awk '{print $2}' | tr -d '"')
+              echo "- **$CHART_NAME**: v$CHART_VERSION (app: $APP_VERSION)" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 Next Steps" >> $GITHUB_STEP_SUMMARY
+          echo "Charts are validated and ready for publishing." >> $GITHUB_STEP_SUMMARY
+          echo "Use the \`publish-to-helm-charts\` workflow to publish to the helm-charts repository." >> $GITHUB_STEP_SUMMARY

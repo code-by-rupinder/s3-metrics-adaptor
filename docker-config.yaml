@@ -1,0 +1,38 @@
+logging:
+  default: info
+  components:
+    eventparser: info
+    metricsexporter: info
+    sqspoller: info
+  format:
+    timestampFormat: "2006-01-02T15:04:05.000Z07:00"
+    prettyPrint: false
+
+sqs:
+  queues: []  # Empty queues for testing
+  buckets: []  # Empty buckets for testing
+  processUnlistedBuckets: false
+  workerCount: 1
+  maxMessages: 1
+  waitTime: 1
+
+metrics:
+  enabled: true
+  types:
+    eventTotal: true
+    objectSize: true
+    userTotal: true
+    ipTotal: true
+    prefixTotal: true
+    prefixDepthTotal: true
+    fileExtensionTotal: true
+    latency: true
+    anomalyDetection: true
+    lifecycleExpiration: true
+    deleteTotal: true
+  prefixDepth: 4
+  objectSizeBuckets:
+    - 1024
+    - 102400
+    - 1048576
+  port: 8087

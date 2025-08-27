@@ -1,0 +1,47 @@
+logging:
+  default: info
+  components:
+    eventparser: info
+    metricsexporter: info
+    sqspoller: info
+  format:
+    timestampFormat: "2006-01-02T15:04:05.000Z07:00"
+    prettyPrint: false
+
+sqs:
+  queues:
+    - https://sqs.us-east-1.amazonaws.com/305018987196/s3event-test-sqs
+
+  buckets:
+    - name: s3event-test-s3
+      prefix:
+        - "logs/test"
+        - "prod"
+        - "logs/prod"
+    - name: s3event-test-ohio-s3
+      prefix:
+        - "logs/prod"
+  processUnlistedBuckets:  true
+  workerCount: 5    # Optional, defaults to 5
+  maxMessages: 10   # Optional, defaults to 10
+  waitTime: 2      # Optional, defaults to 20
+
+metrics:
+  enabled: true
+  types:
+    eventTotal: true
+    objectSize: true
+    ipTotal: true
+    prefixTotal: true     # Enable this to track object metrics
+    prefixDepthTotal: true
+    fileExtensionTotal: true    # Enable tracking of total files by extension
+    latency: true
+    anomalyDetection: true
+    lifecycleExpiration: true
+    deleteTotal: true
+  prefixDepth: 4  # Configures how many path segments to include in hierarchical path tracking
+  objectSizeBuckets:
+    - 1024
+    - 102400
+    - 1048576
+  port: 8087

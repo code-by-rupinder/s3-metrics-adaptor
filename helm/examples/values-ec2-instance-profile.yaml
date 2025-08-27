@@ -1,0 +1,79 @@
+# values-ec2-instance-profile.yaml
+# Example configuration for self-managed Kubernetes on EC2 instances
+# Uses EC2 instance profiles for AWS credentials (no secret needed)
+
+replicaCount: 2
+
+image:
+  repository: codebyrupinder/s3-metrics-prom-adaptor
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+# No AWS credentials needed - using EC2 instance profile
+# Make sure your EC2 instances have an IAM role with:
+# - sqs:ReceiveMessage, sqs:DeleteMessage, sqs:GetQueueAttributes
+# - s3:GetObject, s3:ListBucket
+
+# Optional: Set AWS region explicitly
+env:
+  - name: AWS_REGION
+    value: "us-west-2"
+
+config:
+  logging:
+    default: info
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789/ec2-s3-events"
+    buckets:
+      - name: "ec2-hosted-bucket"
+        prefixes:
+          - "application-logs/"
+          - "system-logs/"
+    processUnlistedBuckets: true
+    workerCount: 5
+
+# EC2 optimized resources
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 75m
+    memory: 96Mi
+
+# Enable auto-scaling for variable workloads
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 75
+
+# Enable monitoring with Prometheus
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+
+# High availability on multi-AZ EC2
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Use EC2 instance metadata for region detection
+podAnnotations:
+  iam.amazonaws.com/role: "ec2-s3-metrics-adapter-role"
+
+# Spread across availability zones
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: app.kubernetes.io/name
+            operator: In
+            values:
+            - s3-metrics-adapter
+        topologyKey: topology.kubernetes.io/zone
