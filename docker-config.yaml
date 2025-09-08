@@ -30,9 +30,27 @@ metrics:
     anomalyDetection: true
     lifecycleExpiration: true
     deleteTotal: true
+    timestampMetrics: true      # Enable Unix timestamp metrics for events
   prefixDepth: 4
   objectSizeBuckets:
     - 1024
     - 102400
     - 1048576
   port: 8087
+  # Path labeling configuration for advanced S3 object path analysis
+  # Path labeling configuration - TODO: Implement in next release
+  # This feature will allow extracting structured labels from S3 object paths
+# Cardinality monitoring configuration
+cardinalityMonitoring:
+  enabled: true
+  logInterval: 300
+  alertThreshold: 1000
+  criticalThreshold: 5000
+  maxCardinality: 10000
+
+# Delete event filtering configuration
+deleteEventFiltering:
+  enabled: true
+  includeActualDeletes: true    # Include actual file deletions
+  includeVersionDeletes: false  # Exclude version deletions (recommended)
+  includeDeleteMarkers: false   # Exclude delete markers (recommended)

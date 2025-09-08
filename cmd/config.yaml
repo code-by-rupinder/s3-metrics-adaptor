@@ -12,12 +12,27 @@ sqs:
   queues:
     - https://sqs-queue-url/acount/name
   buckets:
-    - name: s3-bucket
+    - name: s3event-test-s3
       prefix: 
-        - folder-1
-        - folder-2
-    - name: s3-bucket-2
-      prefix: []
+        - "logs/test"
+        - "prod"
+        - "logs/prod"
+        - "finance"
+        - "hr"
+        - "it"
+        - "marketing"
+        - "operations"
+        - "legal"
+        - "sales"
+        - "research"
+        - "extension_test"
+        - "quick_test"
+        - "load_test"
+        - "bulk_test"
+        - "anomaly_test"
+    - name: s3event-test-ohio-s3
+      prefix: 
+        - "logs/prod"
   processUnlistedBuckets: true
   workerCount: 5    # Optional, defaults to 5
   maxMessages: 10   # Optional, defaults to 10
@@ -35,8 +50,26 @@ metrics:
     anomalyDetection: false
     lifecycleExpiration: true
     deleteTotal: true
+    timestampMetrics: true      # Enable Unix timestamp metrics for events
   objectSizeBuckets:
     - 1024
     - 102400
     - 1048576
   port: 8087
+  # Path labeling configuration for advanced S3 object path analysis
+  # Path labeling configuration - TODO: Implement in next release
+  # This feature will allow extracting structured labels from S3 object paths
+# Cardinality monitoring configuration
+cardinalityMonitoring:
+  enabled: true
+  logInterval: 300
+  alertThreshold: 1000
+  criticalThreshold: 5000
+  maxCardinality: 10000
+
+# Delete event filtering configuration
+deleteEventFiltering:
+  enabled: true
+  includeActualDeletes: true    # Include actual file deletions
+  includeVersionDeletes: false  # Exclude version deletions (recommended)
+  includeDeleteMarkers: false   # Exclude delete markers (recommended)

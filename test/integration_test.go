@@ -216,6 +216,7 @@ metrics:
     anomalyDetection: true
     lifecycleExpiration: true
     deleteTotal: true
+    timestampMetrics: true
   objectSizeBuckets: [1024, 102400, 1048576]
 `
 
@@ -311,7 +312,7 @@ func TestParserIntegration(t *testing.T) {
 			}`,
 			expectError: false,
 			expectedFields: map[string]interface{}{
-				"eventType":  "Object Created",
+				"eventType":  "Object Created.Put",
 				"bucketName": testBucketName,
 				"objectKey":  testObjectKey,
 				"size":       int64(1024),
@@ -448,6 +449,11 @@ func TestMetricsEndToEnd(t *testing.T) {
 	assert.Contains(t, bodyStr, "s3_event_latency_seconds")
 	assert.Contains(t, bodyStr, "s3_event_ip_total")
 
+	// Verify new timestamp metrics are present
+	assert.Contains(t, bodyStr, "s3_event_timestamp_seconds")
+	assert.Contains(t, bodyStr, "s3_event_processing_timestamp_seconds")
+	assert.Contains(t, bodyStr, "s3_event_age_seconds")
+
 	// Verify specific metric values exist
 	assert.Contains(t, bodyStr, `bucket="`+testBucketName+`"`)
 	assert.Contains(t, bodyStr, `prefix="folder1"`)
@@ -518,12 +524,28 @@ func createTestConfig() *config.Config {
 				AnomalyDetection    bool `mapstructure:"anomalyDetection"`
 				LifecycleExpiration bool `mapstructure:"lifecycleExpiration"`
 				DeleteTotal         bool `mapstructure:"deleteTotal"`
+				TimestampMetrics    bool `mapstructure:"timestampMetrics"`
 			} `mapstructure:"types"`
 			ObjectSizeBuckets []float64 `mapstructure:"objectSizeBuckets"`
 			PrefixDepth       int       `mapstructure:"prefixDepth"`
 			Port              int       `mapstructure:"port"`
+			// PathLabeling - TODO: Implement in next release
+			CardinalityMonitoring struct {
+				Enabled           bool `mapstructure:"enabled"`           // Enable cardinality monitoring
+				LogInterval       int  `mapstructure:"logInterval"`       // Interval in seconds for cardinality logging
+				AlertThreshold    int  `mapstructure:"alertThreshold"`    // Alert when cardinality exceeds this value
+				CriticalThreshold int  `mapstructure:"criticalThreshold"` // Critical alert threshold
+				MaxCardinality    int  `mapstructure:"maxCardinality"`    // Maximum allowed cardinality per metric
+			} `mapstructure:"cardinalityMonitoring"`
+			DeleteEventFiltering struct {
+				Enabled               bool `mapstructure:"enabled"`
+				IncludeActualDeletes  bool `mapstructure:"includeActualDeletes"`
+				IncludeVersionDeletes bool `mapstructure:"includeVersionDeletes"`
+				IncludeDeleteMarkers  bool `mapstructure:"includeDeleteMarkers"`
+			} `mapstructure:"deleteEventFiltering"`
 		}{
 			Enabled: true,
+			// PathLabeling - TODO: Implement in next release
 			Types: struct {
 				EventTotal          bool `mapstructure:"eventTotal"`
 				ObjectSize          bool `mapstructure:"objectSize"`
@@ -535,6 +557,7 @@ func createTestConfig() *config.Config {
 				AnomalyDetection    bool `mapstructure:"anomalyDetection"`
 				LifecycleExpiration bool `mapstructure:"lifecycleExpiration"`
 				DeleteTotal         bool `mapstructure:"deleteTotal"`
+				TimestampMetrics    bool `mapstructure:"timestampMetrics"`
 			}{
 				EventTotal:          true,
 				ObjectSize:          true,
@@ -546,6 +569,7 @@ func createTestConfig() *config.Config {
 				AnomalyDetection:    true,
 				LifecycleExpiration: true,
 				DeleteTotal:         true,
+				TimestampMetrics:    true,
 			},
 			ObjectSizeBuckets: []float64{1024, 102400, 1048576},
 			PrefixDepth:       2,

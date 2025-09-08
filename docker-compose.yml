@@ -1,9 +1,17 @@
 version: "3.8"
 
+# Load environment variables from .env file
+# Create a .env file with your sensitive values
+# Example .env file:
+# AWS_ACCESS_KEY_ID=your-access-key
+# AWS_SECRET_ACCESS_KEY=your-secret-key
+# GRAFANA_ADMIN_PASSWORD=your-secure-password
+
 services:
   s3-metrics-adapter:
-    image: codebyrupinder/s3-metrics-adapter:latest
+    image: codebyrupinder/s3-metrics-prom-adaptor:latest
     container_name: s3-metrics-adapter
+    user: "1000:1000" # Run as non-root user
     ports:
       - "8087:8087"
     volumes:
@@ -15,7 +23,7 @@ services:
       # AWS Configuration (alternative to mounting ~/.aws)
       # - AWS_ACCESS_KEY_ID=your-access-key
       # - AWS_SECRET_ACCESS_KEY=your-secret-key
-      - AWS_REGION=us-west-2
+      - AWS_REGION=us-east-1
 
       # Application Configuration (overrides config.yaml values)
       # - SQS_QUEUE_URL=https://sqs.us-west-2.amazonaws.com/123456789/your-queue
@@ -33,11 +41,25 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+        reservations:
+          memory: 256M
+          cpus: "0.25"
 
   # Optional: Prometheus for metrics collection
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.45.0 # Pin to specific version
     container_name: prometheus
+    user: "65534:65534" # Run as nobody user
     ports:
       - "9090:9090"
     volumes:
@@ -49,27 +71,81 @@ services:
       - "--web.console.libraries=/etc/prometheus/console_libraries"
       - "--web.console.templates=/etc/prometheus/consoles"
       - "--web.enable-lifecycle"
+      - "--web.enable-admin-api"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=10GB"
     restart: unless-stopped
     depends_on:
-      - s3-metrics-adapter
+      s3-metrics-adapter:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--no-verbose",
+          "--tries=1",
+          "--spider",
+          "http://localhost:9090/-/healthy",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: "1.0"
+        reservations:
+          memory: 1G
+          cpus: "0.5"
 
   # Optional: Grafana for visualization
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.0.0 # Pin to specific version
     container_name: grafana
+    user: "472:472" # Run as grafana user
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SECURITY_DISABLE_GRAVATAR=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_LOG_LEVEL=warn
     volumes:
       - grafana-data:/var/lib/grafana
       # Mount dashboards directory if you have custom dashboards
-      # - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./docs/grafana-dashboard-sample.json:/etc/grafana/provisioning/dashboards/s3-dashboard.json:ro
       # - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
     restart: unless-stopped
     depends_on:
-      - prometheus
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: "0.5"
+        reservations:
+          memory: 512M
+          cpus: "0.25"
 
 volumes:
   prometheus-data:

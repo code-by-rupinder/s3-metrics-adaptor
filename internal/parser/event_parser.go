@@ -141,8 +141,12 @@ func parseEventBridgeFormat(message string) (*ParsedEvent, error) {
 		return nil, fmt.Errorf("not an EventBridge S3 event")
 	}
 
+	// Convert S3 event names to our format
+	// For EventBridge, we need to construct the full event name from detail-type and reason
+	eventType := convertEventBridgeEventName(event.DetailType, event.Detail.Reason)
+
 	parsedEvent := &ParsedEvent{
-		EventType:   event.DetailType,
+		EventType:   eventType,
 		BucketName:  event.Detail.Bucket.Name,
 		ObjectKey:   event.Detail.Object.Key,
 		Size:        event.Detail.Object.Size,
@@ -174,9 +178,12 @@ func parseLegacyFormat(message string) (*ParsedEvent, error) {
 
 	record := legacyEvent.Records[0]
 
+	// Convert S3 event names to our format
+	eventType := convertS3EventName(record.EventName)
+
 	// Create event
 	event := &ParsedEvent{
-		EventType:   record.EventName,
+		EventType:   eventType,
 		BucketName:  record.S3.Bucket.Name,
 		ObjectKey:   record.S3.Object.Key,
 		Size:        record.S3.Object.Size,
@@ -238,4 +245,78 @@ func (p *ParsedEvent) LogEventDetails() {
 		TraceID:   p.RequestID,
 	}, fmt.Sprintf("S3 event details: size=%d bytes, type=%s, requester=%s, source_ip=%s, time=%s",
 		p.Size, p.FileType, p.RequesterID, p.SourceIP, p.Time.Format(time.RFC3339)))
+}
+
+// convertS3EventName converts S3 event names to our internal format
+// Examples:
+//
+//	"s3:ObjectCreated:Put" -> "Object Created.Put"
+//	"s3:ObjectCreated:Post" -> "Object Created.Post"
+//	"s3:ObjectCreated:Copy" -> "Object Created.Copy"
+//	"s3:ObjectCreated:CompleteMultipartUpload" -> "Object Created.CompleteMultipartUpload"
+//	"s3:ObjectRemoved:Delete" -> "Object Deleted.Delete"
+//	"s3:ObjectRemoved:DeleteMarkerCreated" -> "Object Deleted.DeleteMarkerCreated"
+func convertS3EventName(s3EventName string) string {
+	// Handle S3 event names like "s3:ObjectCreated:Put"
+	if strings.HasPrefix(s3EventName, "s3:") {
+		parts := strings.Split(s3EventName, ":")
+		if len(parts) >= 3 {
+			eventCategory := parts[1] // "ObjectCreated" or "ObjectRemoved"
+			eventSubtype := parts[2]  // "Put", "Post", "Copy", etc.
+
+			// Convert to our format
+			switch eventCategory {
+			case "ObjectCreated":
+				return fmt.Sprintf("Object Created.%s", eventSubtype)
+			case "ObjectRemoved":
+				return fmt.Sprintf("Object Deleted.%s", eventSubtype)
+			default:
+				// For other event types, just return as-is
+				return s3EventName
+			}
+		}
+	}
+
+	// If it doesn't match the expected format, return as-is
+	return s3EventName
+}
+
+// convertEventBridgeEventName converts EventBridge S3 events to our internal format
+// EventBridge sends simplified detail-type like "Object Created" and puts the specific operation in reason
+// Examples:
+//
+//	detailType: "Object Created", reason: "PutObject" -> "Object Created.Put"
+//	detailType: "Object Created", reason: "PostObject" -> "Object Created.Post"
+//	detailType: "Object Created", reason: "CopyObject" -> "Object Created.Copy"
+//	detailType: "Object Created", reason: "CompleteMultipartUpload" -> "Object Created.CompleteMultipartUpload"
+//	detailType: "Object Deleted", reason: "DeleteObject" -> "Object Deleted.Delete"
+//	detailType: "Object Deleted", reason: "DeleteMarkerCreated" -> "Object Deleted.DeleteMarkerCreated"
+func convertEventBridgeEventName(detailType, reason string) string {
+	// Map reason to subtype
+	subtype := ""
+	switch reason {
+	case "PutObject":
+		subtype = "Put"
+	case "PostObject":
+		subtype = "Post"
+	case "CopyObject":
+		subtype = "Copy"
+	case "CompleteMultipartUpload":
+		subtype = "CompleteMultipartUpload"
+	case "DeleteObject":
+		subtype = "Delete"
+	case "DeleteMarkerCreated":
+		subtype = "DeleteMarkerCreated"
+	default:
+		// For unknown reasons, try to use the reason as-is
+		subtype = reason
+	}
+
+	// Combine detail-type with subtype
+	if subtype != "" {
+		return fmt.Sprintf("%s.%s", detailType, subtype)
+	}
+
+	// If no subtype could be determined, return just the detail-type
+	return detailType
 }

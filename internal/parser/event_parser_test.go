@@ -14,7 +14,7 @@ const (
 	testRequestID         = "req123"
 
 	// Event types and reasons
-	eventTypeObjectDeleted    = "Object Deleted"
+	eventTypeObjectDeleted    = "Object Deleted.Delete"
 	eventTypeObjectCreated    = "Object Created"
 	eventTypeObjectCreatedPut = "ObjectCreated:Put"
 	reasonLifecycleExpiration = "Lifecycle Expiration"
@@ -212,8 +212,9 @@ func TestLifecycleExpirationEvent(t *testing.T) {
 	}
 
 	t.Run(testCheckEventType, func(t *testing.T) {
-		if event.EventType != eventTypeObjectDeleted {
-			t.Errorf(errEventType, eventTypeObjectDeleted, event.EventType)
+		expectedEventType := "Object Deleted.Lifecycle Expiration"
+		if event.EventType != expectedEventType {
+			t.Errorf(errEventType, expectedEventType, event.EventType)
 		}
 	})
 

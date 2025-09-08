@@ -66,16 +66,18 @@ func TestFileExtensionMetrics(t *testing.T) {
 				RequesterID: testUser,
 			},
 			check: func(t *testing.T, m *Metrics) {
-				checkFileExtensionMetric(t, m, testBucket, ".txt", testFolder, "file", -1)
+				// File extension metrics are counters - deletions don't change the count
+				// The count should remain the same as before the deletion
+				checkFileExtensionMetric(t, m, testBucket, ".txt", testFolder, "file", 1)
 			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetMetrics(m)  // Unregister existing metrics
-			m = Initialize(cfg)  // Create new metrics instance
-			
+			resetMetrics(m)     // Unregister existing metrics
+			m = Initialize(cfg) // Create new metrics instance
+
 			// For deletion tests, set initial value after initialization but before processing event
 			if tt.event.EventType == eventMainObjectDeleted+"."+eventSubTypeDelete && m.fileExtensionTotal != nil {
 				info := getFileInfo(tt.event.ObjectKey)
