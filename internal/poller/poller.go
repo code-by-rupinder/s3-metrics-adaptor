@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"s3_metrics_adapter/internal/config"
@@ -32,10 +33,54 @@ const (
 	waitTimeSeconds = 2
 	maxRetries      = 3
 	backoffBase     = 2 * time.Second
+	// Circuit breaker constants
+	circuitBreakerFailureThreshold = 5
+	circuitBreakerTimeout          = 30 * time.Second
+	// Batch processing constants
+	batchSize    = 10
+	batchTimeout = 100 * time.Millisecond
+	// Cache constants - TODO: Implement in next release
 )
 
 // ErrInvalidQueueURL is returned when the queue URL is invalid
 var ErrInvalidQueueURL = errors.New("invalid queue URL format")
+
+// CircuitBreakerState represents the state of the circuit breaker
+type CircuitBreakerState int
+
+const (
+	CircuitBreakerClosed CircuitBreakerState = iota
+	CircuitBreakerOpen
+	CircuitBreakerHalfOpen
+)
+
+// CircuitBreaker implements the circuit breaker pattern for parsing failures
+type CircuitBreaker struct {
+	state        CircuitBreakerState
+	failureCount int32
+	lastFailTime time.Time
+	mutex        sync.RWMutex
+}
+
+// PathLabelCacheEntry - TODO: Implement in next release
+
+// BatchProcessor handles batch processing of messages
+type BatchProcessor struct {
+	batch     []types.Message
+	mutex     sync.Mutex
+	timer     *time.Timer
+	processor func([]types.Message) error
+}
+
+// PerformanceMetrics tracks processing performance
+type PerformanceMetrics struct {
+	MessagesProcessed int64
+	MessagesPerSecond float64
+	ParseTimeTotal    int64
+	ParseTimeCount    int64
+	LastUpdateTime    time.Time
+	mutex             sync.RWMutex
+}
 
 type SQSPoller struct {
 	queues        []string
@@ -45,6 +90,11 @@ type SQSPoller struct {
 	retryBackoff  time.Duration
 	config        *config.Config
 	clientFactory func(region string) (SQSClientInterface, error)
+	// New optimization components
+	circuitBreaker *CircuitBreaker
+	// Path label cache - TODO: Implement in next release
+	batchProcessor     *BatchProcessor
+	performanceMetrics *PerformanceMetrics
 }
 
 // NewPoller creates a new SQS poller instance
@@ -56,6 +106,168 @@ func NewPoller(cfg *config.Config) *SQSPoller {
 		retryBackoff:  backoffBase,
 		config:        cfg,
 		clientFactory: defaultClientFactory,
+		// Initialize optimization components
+		circuitBreaker: &CircuitBreaker{
+			state:        CircuitBreakerClosed,
+			failureCount: 0,
+		},
+		// Path label cache - TODO: Implement in next release
+		performanceMetrics: &PerformanceMetrics{
+			LastUpdateTime: time.Now(),
+		},
+	}
+}
+
+// Circuit breaker methods
+func (cb *CircuitBreaker) CanExecute() bool {
+	cb.mutex.RLock()
+	defer cb.mutex.RUnlock()
+
+	if cb.state == CircuitBreakerClosed {
+		return true
+	}
+
+	if cb.state == CircuitBreakerOpen {
+		return time.Since(cb.lastFailTime) > circuitBreakerTimeout
+	}
+
+	return true // Half-open state
+}
+
+func (cb *CircuitBreaker) RecordSuccess() {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+
+	cb.failureCount = 0
+	cb.state = CircuitBreakerClosed
+}
+
+func (cb *CircuitBreaker) RecordFailure() {
+	cb.mutex.Lock()
+	defer cb.mutex.Unlock()
+
+	cb.failureCount++
+	cb.lastFailTime = time.Now()
+
+	if cb.failureCount >= circuitBreakerFailureThreshold {
+		cb.state = CircuitBreakerOpen
+	}
+}
+
+// Path label cache methods - TODO: Implement in next release
+
+// Performance metrics methods
+func (pm *PerformanceMetrics) RecordMessageProcessed() {
+	atomic.AddInt64(&pm.MessagesProcessed, 1)
+}
+
+func (pm *PerformanceMetrics) RecordParseTime(duration time.Duration) {
+	atomic.AddInt64(&pm.ParseTimeTotal, int64(duration.Nanoseconds()))
+	atomic.AddInt64(&pm.ParseTimeCount, 1)
+}
+
+func (pm *PerformanceMetrics) GetMessagesPerSecond() float64 {
+	pm.mutex.RLock()
+	defer pm.mutex.RUnlock()
+
+	now := time.Now()
+	elapsed := now.Sub(pm.LastUpdateTime).Seconds()
+	if elapsed == 0 {
+		return 0
+	}
+
+	messages := atomic.LoadInt64(&pm.MessagesProcessed)
+	pm.LastUpdateTime = now
+
+	return float64(messages) / elapsed
+}
+
+func (pm *PerformanceMetrics) GetAverageParseTime() time.Duration {
+	parseTimeTotal := atomic.LoadInt64(&pm.ParseTimeTotal)
+	parseTimeCount := atomic.LoadInt64(&pm.ParseTimeCount)
+
+	if parseTimeCount == 0 {
+		return 0
+	}
+
+	return time.Duration(parseTimeTotal / parseTimeCount)
+}
+
+// Message filtering - check if message should be processed before parsing
+func (p *SQSPoller) shouldProcessMessage(msgBody string) bool {
+	// Temporarily disable filtering to debug metrics issue
+	// TODO: Re-enable with proper S3 event detection
+	return true
+
+	// Quick JSON parsing to extract bucket and key without full parsing
+	// This is a simple heuristic - in production you might want more sophisticated filtering
+	if !strings.Contains(msgBody, "Records") {
+		return false
+	}
+
+	// Check for S3 event patterns
+	if !strings.Contains(msgBody, "s3") && !strings.Contains(msgBody, "S3") {
+		return false
+	}
+
+	return true
+}
+
+// extractPathLabels - TODO: Implement in next release
+// This function will extract structured labels from S3 object paths
+
+// updatePerformanceMetrics updates performance metrics for the poller
+func (p *SQSPoller) updatePerformanceMetrics(queueURL string, batchSize int) {
+	m := metrics.GetMetrics()
+	if m == nil {
+		return
+	}
+
+	// Get performance metrics
+	messagesPerSecond := p.performanceMetrics.GetMessagesPerSecond()
+	avgParseTime := p.performanceMetrics.GetAverageParseTime()
+
+	// Update metrics
+	m.UpdatePerformanceMetrics(queueURL, messagesPerSecond, avgParseTime, batchSize, "success")
+}
+
+// Batch processing methods
+func (bp *BatchProcessor) AddMessage(msg types.Message) {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+
+	bp.batch = append(bp.batch, msg)
+
+	// Start timer if this is the first message in the batch
+	if len(bp.batch) == 1 {
+		bp.timer = time.AfterFunc(batchTimeout, func() {
+			bp.processBatch()
+		})
+	}
+
+	// Process immediately if batch is full
+	if len(bp.batch) >= batchSize {
+		bp.timer.Stop()
+		bp.processBatch()
+	}
+}
+
+func (bp *BatchProcessor) processBatch() {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+
+	if len(bp.batch) == 0 {
+		return
+	}
+
+	// Create a copy of the batch and reset
+	batch := make([]types.Message, len(bp.batch))
+	copy(batch, bp.batch)
+	bp.batch = bp.batch[:0]
+
+	// Process the batch
+	if bp.processor != nil {
+		bp.processor(batch)
 	}
 }
 
@@ -68,6 +280,15 @@ func NewPollerWithClientFactory(cfg *config.Config, clientFactory func(region st
 		retryBackoff:  backoffBase,
 		config:        cfg,
 		clientFactory: clientFactory,
+		// Initialize optimization components
+		circuitBreaker: &CircuitBreaker{
+			state:        CircuitBreakerClosed,
+			failureCount: 0,
+		},
+		// Path label cache - TODO: Implement in next release
+		performanceMetrics: &PerformanceMetrics{
+			LastUpdateTime: time.Now(),
+		},
 	}
 }
 
@@ -198,32 +419,109 @@ func (p *SQSPoller) receiveAndProcessMessages(ctx context.Context, client SQSCli
 		return fmt.Errorf("failed to receive messages: %w", err)
 	}
 
+	// Filter messages before processing
+	var validMessages []types.Message
 	for _, msg := range output.Messages {
-		if err := p.processMessage(ctx, client, queueURL, msg); err != nil {
-			// Log the message body for debugging
-			logger.Debug(logger.LogContext{
+		if msg.Body != nil {
+			logger.Info(logger.LogContext{
 				Component: "sqspoller",
 				TraceID:   *msg.MessageId,
-			}, fmt.Sprintf("Failed message content (Queue: %s): %s", queueURL, *msg.Body))
+			}, fmt.Sprintf("Received message (Queue: %s): %s", queueURL, *msg.Body))
 
-			logger.Error(logger.LogContext{
-				Component: "sqspoller",
-				TraceID:   *msg.MessageId,
-			}, fmt.Errorf("failed to process message from %s: %w", queueURL, err))
-
-			// Delete failed messages to avoid poison pill
-			if _, delErr := client.DeleteMessage(ctx, &awsSQS.DeleteMessageInput{
-				QueueUrl:      aws.String(queueURL),
-				ReceiptHandle: msg.ReceiptHandle,
-			}); delErr != nil {
-				logger.Error(logger.LogContext{
+			if p.shouldProcessMessage(*msg.Body) {
+				validMessages = append(validMessages, msg)
+				logger.Info(logger.LogContext{
 					Component: "sqspoller",
 					TraceID:   *msg.MessageId,
-				}, fmt.Errorf("failed to delete failed message from %s: %w", queueURL, delErr))
+				}, "Message passed filtering - will be processed")
+			} else {
+				// Delete filtered messages immediately
+				logger.Info(logger.LogContext{
+					Component: "sqspoller",
+					TraceID:   *msg.MessageId,
+				}, fmt.Sprintf("Filtering out message (Queue: %s): %s", queueURL, *msg.Body))
+
+				if _, delErr := client.DeleteMessage(ctx, &awsSQS.DeleteMessageInput{
+					QueueUrl:      aws.String(queueURL),
+					ReceiptHandle: msg.ReceiptHandle,
+				}); delErr != nil {
+					logger.Error(logger.LogContext{
+						Component: "sqspoller",
+						TraceID:   *msg.MessageId,
+					}, fmt.Errorf("failed to delete filtered message from %s: %w", queueURL, delErr))
+				}
 			}
-			continue // Continue processing other messages
 		}
 	}
+
+	// Process valid messages in batch
+	if len(validMessages) > 0 {
+		return p.processBatchMessages(ctx, client, queueURL, validMessages)
+	}
+
+	return nil
+}
+
+// processBatchMessages processes a batch of messages with optimizations
+func (p *SQSPoller) processBatchMessages(ctx context.Context, client SQSClientInterface, queueURL string, messages []types.Message) error {
+	// Check circuit breaker
+	if !p.circuitBreaker.CanExecute() {
+		logger.Warn(logger.LogContext{
+			Component: "sqspoller",
+		}, "Circuit breaker is open, skipping message processing")
+		return nil
+	}
+
+	// Process messages in parallel (with controlled concurrency)
+	semaphore := make(chan struct{}, 5) // Limit concurrent processing
+	var wg sync.WaitGroup
+	var errors []error
+	var errorMutex sync.Mutex
+
+	for _, msg := range messages {
+		wg.Add(1)
+		go func(message types.Message) {
+			defer wg.Done()
+
+			semaphore <- struct{}{}        // Acquire semaphore
+			defer func() { <-semaphore }() // Release semaphore
+
+			if err := p.processMessage(ctx, client, queueURL, message); err != nil {
+				errorMutex.Lock()
+				errors = append(errors, err)
+				errorMutex.Unlock()
+
+				// Record circuit breaker failure
+				p.circuitBreaker.RecordFailure()
+
+				// Delete failed message
+				if _, delErr := client.DeleteMessage(ctx, &awsSQS.DeleteMessageInput{
+					QueueUrl:      aws.String(queueURL),
+					ReceiptHandle: message.ReceiptHandle,
+				}); delErr != nil {
+					logger.Error(logger.LogContext{
+						Component: "sqspoller",
+						TraceID:   *message.MessageId,
+					}, fmt.Errorf("failed to delete failed message from %s: %w", queueURL, delErr))
+				}
+			} else {
+				// Record circuit breaker success
+				p.circuitBreaker.RecordSuccess()
+			}
+		}(msg)
+	}
+
+	wg.Wait()
+
+	// Log any errors but don't fail the entire batch
+	if len(errors) > 0 {
+		logger.Error(logger.LogContext{
+			Component: "sqspoller",
+		}, fmt.Errorf("processed batch with %d errors out of %d messages", len(errors), len(messages)))
+	}
+
+	// Update performance metrics
+	p.updatePerformanceMetrics(queueURL, len(messages))
 
 	return nil
 }
@@ -233,6 +531,13 @@ func (p *SQSPoller) processMessage(ctx context.Context, client SQSClientInterfac
 	if msg.Body == nil {
 		return errors.New("received message with nil body")
 	}
+
+	// Record performance metrics
+	startTime := time.Now()
+	defer func() {
+		p.performanceMetrics.RecordMessageProcessed()
+		p.performanceMetrics.RecordParseTime(time.Since(startTime))
+	}()
 
 	// Parse the message
 	parsedEvent, err := p.eventParser.Parse(*msg.Body)
@@ -270,6 +575,8 @@ func (p *SQSPoller) processMessage(ctx context.Context, client SQSClientInterfac
 		Component: "sqspoller",
 		TraceID:   parsedEvent.RequestID,
 	}, fmt.Sprintf("Processing allowed event: %s/%s", parsedEvent.BucketName, parsedEvent.ObjectKey))
+
+	// Path labeling - TODO: Implement in next release
 
 	// Update metrics
 	m := metrics.GetMetrics()

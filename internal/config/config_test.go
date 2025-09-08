@@ -68,6 +68,10 @@ func verifyMetricsConfig(t *testing.T, cfg *Config) {
 		t.Error("Expected fileExtensionTotal metric to be enabled")
 	}
 
+	if !cfg.Metrics.Types.TimestampMetrics {
+		t.Error("Expected timestampMetrics to be enabled")
+	}
+
 	if cfg.Metrics.PrefixDepth != 2 {
 		t.Errorf("Expected prefix depth 2, got %d", cfg.Metrics.PrefixDepth)
 	}
@@ -109,6 +113,7 @@ metrics:
     anomalyDetection: false
     lifecycleExpiration: true
     deleteTotal: true
+    timestampMetrics: true
   prefixDepth: 2
   objectSizeBuckets:
     - 1024
@@ -199,13 +204,40 @@ func TestValidateConfig(t *testing.T) {
 						AnomalyDetection    bool `mapstructure:"anomalyDetection"`
 						LifecycleExpiration bool `mapstructure:"lifecycleExpiration"`
 						DeleteTotal         bool `mapstructure:"deleteTotal"`
+						TimestampMetrics    bool `mapstructure:"timestampMetrics"`
 					} `mapstructure:"types"`
 					ObjectSizeBuckets []float64 `mapstructure:"objectSizeBuckets"`
 					PrefixDepth       int       `mapstructure:"prefixDepth"`
 					Port              int       `mapstructure:"port"`
+					// PathLabeling - TODO: Implement in next release
+					CardinalityMonitoring struct {
+						Enabled           bool `mapstructure:"enabled"`           // Enable cardinality monitoring
+						LogInterval       int  `mapstructure:"logInterval"`       // Interval in seconds for cardinality logging
+						AlertThreshold    int  `mapstructure:"alertThreshold"`    // Alert when cardinality exceeds this value
+						CriticalThreshold int  `mapstructure:"criticalThreshold"` // Critical alert threshold
+						MaxCardinality    int  `mapstructure:"maxCardinality"`    // Maximum allowed cardinality per metric
+					} `mapstructure:"cardinalityMonitoring"`
+					DeleteEventFiltering struct {
+						Enabled               bool `mapstructure:"enabled"`
+						IncludeActualDeletes  bool `mapstructure:"includeActualDeletes"`
+						IncludeVersionDeletes bool `mapstructure:"includeVersionDeletes"`
+						IncludeDeleteMarkers  bool `mapstructure:"includeDeleteMarkers"`
+					} `mapstructure:"deleteEventFiltering"`
 				}{
 					Enabled: true,
 					Port:    8087,
+					DeleteEventFiltering: struct {
+						Enabled               bool `mapstructure:"enabled"`
+						IncludeActualDeletes  bool `mapstructure:"includeActualDeletes"`
+						IncludeVersionDeletes bool `mapstructure:"includeVersionDeletes"`
+						IncludeDeleteMarkers  bool `mapstructure:"includeDeleteMarkers"`
+					}{
+						Enabled:               true,
+						IncludeActualDeletes:  true,
+						IncludeVersionDeletes: false,
+						IncludeDeleteMarkers:  false,
+					},
+					// PathLabeling - TODO: Implement in next release
 				},
 				SQS: struct {
 					Queues  []string `mapstructure:"queues"`

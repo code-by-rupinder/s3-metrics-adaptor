@@ -1,11 +1,13 @@
 # S3 Metrics Adapter - Metrics Documentation
 
 ## Overview
+
 This S3 metrics adapter collects and exposes various Prometheus metrics for S3 event monitoring. All metrics are configurable and can be enabled/disabled individually through the configuration.
 
 ## Available Metrics
 
 ### 1. Event Total (`s3_event_total`)
+
 - **Type**: Counter
 - **Description**: Total number of S3 events received, including specific event subtypes
 - **Labels**:
@@ -15,6 +17,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
 - **Example**: `s3_event_total{event="Object Created",bucket="my-bucket",subtype="Put"}`
 
 ### 2. Object Size (`s3_event_object_size_bytes`)
+
 - **Type**: Histogram
 - **Description**: Distribution of S3 object sizes in bytes
 - **Labels**:
@@ -23,20 +26,23 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
 - **Buckets**: Configurable, defaults to exponential buckets from 1KB to 16TB
 - **Note**: Only tracks size for "Object Created" events; other events record 0
 
-
 ### 4. IP Total (`s3_event_ip_total`)
+
 - **Type**: Counter
 - **Description**: Total number of S3 events by source IP address
 - **Labels**:
   - `ip`: Source IP address or "unknown" if not available
 
 ### 5. Prefix Total (`s3_event_prefix_total`)
+
 - **Type**: Counter
 - **Description**: Total number of S3 events by object prefix (top-level directory)
 - **Labels**:
   - `prefix`: Top-level prefix or "/" for root-level objects
+  - `bucket`: S3 bucket name
 
 ### 6. Hierarchical Path Total (`s3_events_hierarchical_path_total`)
+
 - **Type**: Counter
 - **Description**: Total number of S3 events grouped by hierarchical path at configured directory depth
 - **Labels**:
@@ -45,6 +51,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
 - **Configuration**: Depth is configurable via `PrefixDepth` setting
 
 ### 7. File Extension Total (`s3_bucket_extension_files_total`)
+
 - **Type**: Gauge
 - **Description**: Total number of files by extension in bucket
 - **Labels**:
@@ -52,14 +59,60 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
   - `extension`: File extension (lowercase with dot) or "none" for files without extension
   - `prefix`: Object prefix
   - `filetype`: Either "file" or "directory"
+
+### 8. Event Timestamp (`s3_event_timestamp_seconds`)
+
+- **Type**: Gauge
+- **Description**: Unix timestamp when the S3 event occurred (aggregated by event type and bucket)
+- **Labels**:
+  - `event_type`: Type of S3 event (e.g., "ObjectCreated:Put", "ObjectRemoved:Delete")
+  - `bucket`: S3 bucket name
+- **Example**: `s3_event_timestamp_seconds{event_type="ObjectCreated:Put",bucket="my-bucket"}`
+
+### 9. Event Processing Timestamp (`s3_event_processing_timestamp_seconds`)
+
+- **Type**: Gauge
+- **Description**: Unix timestamp when the S3 event was processed by the adapter (aggregated by event type and bucket)
+- **Labels**:
+  - `event_type`: Type of S3 event (e.g., "ObjectCreated:Put", "ObjectRemoved:Delete")
+  - `bucket`: S3 bucket name
+- **Example**: `s3_event_processing_timestamp_seconds{event_type="ObjectCreated:Put",bucket="my-bucket"}`
+
+### 10. Event Age (`s3_event_age_seconds`)
+
+- **Type**: Gauge
+- **Description**: Age of the S3 event when processed (event_timestamp - processing_timestamp) in seconds (aggregated by event type and bucket)
+- **Labels**:
+  - `event_type`: Type of S3 event (e.g., "ObjectCreated:Put", "ObjectRemoved:Delete")
+  - `bucket`: S3 bucket name
+- **Example**: `s3_event_age_seconds{event_type="ObjectCreated:Put",bucket="my-bucket"}`
 - **Behavior**:
   - Increments on "Object Created" events
   - Sets to -1 on "Object Deleted" events
 - **Special Cases**:
   - Hidden files (starting with .) are marked as extension "none"
+
+### 11. Cardinality Monitoring (`s3_metrics_cardinality_total`)
+
+- **Type**: Gauge
+- **Description**: Number of unique label combinations for each metric to monitor cardinality and prevent metric explosion
+- **Labels**:
+  - `metric_name`: Name of the metric being monitored
+  - `status`: Cardinality status ("normal", "high", "warning", "critical")
+- **Example**: `s3_metrics_cardinality_total{metric_name="s3_event_total",status="normal"} 150`
+- **Behavior**:
+  - Tracks cardinality for all registered metrics
+  - Status levels: normal < high < warning < critical
+  - Used for monitoring and alerting on cardinality issues
+- **Configuration**:
+  - `cardinalityMonitoring.enabled`: Enable/disable cardinality monitoring
+  - `cardinalityMonitoring.alertThreshold`: Alert when cardinality exceeds this value
+  - `cardinalityMonitoring.criticalThreshold`: Critical alert threshold
+  - `cardinalityMonitoring.maxCardinality`: Maximum allowed cardinality per metric
   - Directories (ending with /) are marked as filetype "directory"
 
 ### 8. Latency (`s3_event_latency_seconds`)
+
 - **Type**: Gauge
 - **Description**: Time in seconds between event creation and processing
 - **Labels**:
@@ -67,6 +120,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
   - `event`: Full event type
 
 ### 9. Anomaly Total (`s3_event_anomaly_total`)
+
 - **Type**: Counter
 - **Description**: Total number of detected anomalies in S3 operations
 - **Labels**:
@@ -77,6 +131,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
   - `manual_delete`: Manual deletions via DeleteObject API
 
 ### 10. Lifecycle Expiration Total (`s3_lifecycle_expiration_total`)
+
 - **Type**: Counter
 - **Description**: Total number of objects deleted via lifecycle expiration policies
 - **Labels**:
@@ -85,6 +140,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
 - **Trigger**: Only increments when deletion reason is "Lifecycle Expiration"
 
 ### 11. Delete Total (`s3_delete_total`)
+
 - **Type**: Counter
 - **Description**: Total number of delete events with detailed categorization
 - **Labels**:
@@ -93,6 +149,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
   - `reason`: Reason for deletion (e.g., "DeleteObject", "Lifecycle Expiration")
 
 ### 12. Parser Errors Total (`s3_event_parser_errors_total`)
+
 - **Type**: Counter
 - **Description**: Total number of S3 event parsing errors
 - **Note**: Always enabled regardless of configuration
@@ -101,6 +158,7 @@ This S3 metrics adapter collects and exposes various Prometheus metrics for S3 e
 ## Configuration
 
 ### Enabling/Disabling Metrics
+
 All metrics (except parser errors) can be individually enabled or disabled through the configuration:
 
 ```yaml
@@ -119,9 +177,11 @@ metrics:
 ```
 
 ### Object Size Buckets
+
 The histogram buckets for object size can be customized via `config.Metrics.ObjectSizeBuckets`. If not specified, defaults to exponential buckets from 1KB to 16TB.
 
 ### Prefix Depth
+
 The hierarchical path depth can be configured via `config.Metrics.PrefixDepth` to control how deep the path tracking goes.
 
 ## Usage Pattern
@@ -134,19 +194,23 @@ The hierarchical path depth can be configured via `config.Metrics.PrefixDepth` t
 ## Metric Categories
 
 ### Core Event Metrics
+
 - Event Total
 - Object Size
 - IP Total
 
 ### Organization Metrics
+
 - Prefix Total
 - Hierarchical Path Total
 - File Extension Total
 
 ### Performance Metrics
+
 - Latency
 
 ### Operational Metrics
+
 - Anomaly Total
 - Lifecycle Expiration Total
 - Delete Total

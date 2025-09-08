@@ -98,6 +98,77 @@ helm upgrade s3-metrics-adapter helm-charts/s3-metrics-adapter -n monitoring -f 
 
 ---
 
+## Configuration Examples
+
+### Basic Configuration
+
+```yaml
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789012/s3-events"
+  metrics:
+    enabled: true
+    types:
+      eventTotal: true
+      objectSize: true
+      prefixTotal: true
+      timestampMetrics: true
+```
+
+### Department/Year/Quarter Pattern
+
+```yaml
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789012/s3-events"
+  metrics:
+    enabled: true
+    # Path labeling configuration - TODO: Implement in next release
+    types:
+      eventTotal: true
+      objectSize: true
+      prefixTotal: true
+      timestampMetrics: true
+```
+
+### Team/Project/Environment Pattern
+
+```yaml
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789012/s3-events"
+  metrics:
+    enabled: true
+    # Path labeling configuration - TODO: Implement in next release
+    types:
+      eventTotal: true
+      objectSize: true
+      prefixTotal: true
+      timestampMetrics: true
+```
+
+### Custom Segment Pattern
+
+```yaml
+config:
+  sqs:
+    queues:
+      - "https://sqs.us-west-2.amazonaws.com/123456789012/s3-events"
+  metrics:
+    enabled: true
+    # Path labeling configuration - TODO: Implement in next release
+    types:
+      eventTotal: true
+      objectSize: true
+      prefixTotal: true
+      timestampMetrics: true
+```
+
+---
+
 ## Troubleshooting
 
 - Check pod logs:
@@ -153,6 +224,24 @@ helm upgrade s3-metrics-adapter helm-charts/s3-metrics-adapter -n monitoring -f 
 | `config.sqs.maxMessages` | Max messages per request | `10`    |
 | `config.sqs.waitTime`    | Long polling wait time   | `20`    |
 | `config.logging.default` | Log level                | `info`  |
+
+### Metrics Configuration
+
+| Parameter                               | Description                          | Default |
+| --------------------------------------- | ------------------------------------ | ------- |
+| `config.metrics.enabled`                | Enable metrics collection            | `true`  |
+| `config.metrics.types.eventTotal`       | Track event totals                   | `true`  |
+| `config.metrics.types.objectSize`       | Track object size distribution       | `true`  |
+| `config.metrics.types.prefixTotal`      | Track events by prefix               | `true`  |
+| `config.metrics.types.timestampMetrics` | Track event timestamps               | `true`  |
+| `config.metrics.prefixDepth`            | Depth for hierarchical path analysis | `4`     |
+| `config.metrics.port`                   | Metrics server port                  | `8087`  |
+
+### Path Labeling Configuration
+
+| Parameter                       | Description                                                   | Default |
+| ------------------------------- | ------------------------------------------------------------- | ------- |
+| `config.metrics.pathLabeling.*` | Path labeling configuration - TODO: Implement in next release | N/A     |
 
 ### Resources and Scaling
 

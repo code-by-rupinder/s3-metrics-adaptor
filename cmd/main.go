@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"net/http"
@@ -321,8 +322,43 @@ func main() {
 	// Set up HTTP server for Prometheus metrics
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte("healthy")); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+
+		// Get cardinality health information
+		cardinalityHealth := metrics.GetMetrics().GetCardinalityHealth()
+
+		// Determine overall health status
+		status := "healthy"
+		if cardinalityHealth["status"] == "critical" {
+			status = "critical"
+			w.WriteHeader(http.StatusInternalServerError)
+		} else if cardinalityHealth["status"] == "warning" {
+			status = "warning"
+			w.WriteHeader(http.StatusOK)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+
+		// Create health response
+		healthResponse := map[string]interface{}{
+			"status":                 status,
+			"timestamp":              time.Now().Format(time.RFC3339),
+			"cardinality_monitoring": cardinalityHealth,
+		}
+
+		// Convert to JSON
+		jsonResponse, err := json.MarshalIndent(healthResponse, "", "  ")
+		if err != nil {
+			logger.Warn(logger.LogContext{
+				Operation: "HealthHandler",
+				Component: "Main",
+			}, err, "Failed to marshal health response")
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte(`{"status":"error","message":"Failed to generate health response"}`))
+			return
+		}
+
+		if _, err := w.Write(jsonResponse); err != nil {
 			logger.Warn(logger.LogContext{
 				Operation: "HealthHandler",
 				Component: "Main",

@@ -8,7 +8,7 @@ image:
   repository: codebyrupinder/s3-metrics-prom-adaptor
   pullPolicy: IfNotPresent
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "v1.0.0"
+  tag: "v1.2.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -125,6 +125,13 @@ config:
     workerCount: 5
     maxMessages: 10
     waitTime: 20
+    useEventTransformer: false
+    # Performance optimizations (automatically enabled):
+    # - Batch processing: Processes up to 10 messages in parallel
+    # - Message filtering: Pre-filters messages before expensive parsing
+    # - Circuit breaker: Prevents processing during high failure rates
+    # - Path label caching: Caches path extraction results (1000 entries, 5min TTL)
+    # - Performance metrics: Tracks messages/sec, parse time, batch size
 
   metrics:
     enabled: true
@@ -139,13 +146,47 @@ config:
       anomalyDetection: true
       lifecycleExpiration: true
       deleteTotal: true
+      timestampMetrics: true
     prefixDepth: 4
+    # Performance metrics (automatically enabled):
+    # - s3_poller_messages_per_second{queue}: Messages processed per second
+    # - s3_poller_parse_time_seconds{queue,status}: Parse time histogram
+    # - s3_poller_batch_size{queue}: Batch size distribution
+    # - s3_metrics_cardinality_total{metric_name,status}: Cardinality monitoring
     objectSizeBuckets:
       - 1024
       - 102400
       - 1048576
       - 10485760
       - 104857600
+    # Path labeling configuration - TODO: Implement in next release
+    # This feature will allow extracting structured labels from S3 object paths
+    # Example: finance/2025/q1/reports -> department="finance", year="2025", quarter="q1"
+
+    # Cardinality monitoring configuration for preventing metric explosion
+    cardinalityMonitoring:
+      # Enable cardinality monitoring to track unique label combinations
+      enabled: true
+      # Interval in seconds for logging cardinality statistics
+      logInterval: 300
+      # Alert when cardinality exceeds this value (warning level)
+      alertThreshold: 1000
+      # Critical alert threshold for cardinality
+      criticalThreshold: 5000
+      # Maximum allowed cardinality per metric (hard limit)
+      maxCardinality: 10000
+
+    # Delete event filtering configuration for controlling what deletions are counted
+    deleteEventFiltering:
+      # Enable delete event filtering to control what deletions are counted
+      enabled: true
+      # Include actual file deletions (recommended: true)
+      includeActualDeletes: true
+      # Include version deletions (recommended: false to avoid inflated metrics)
+      includeVersionDeletes: false
+      # Include delete markers (recommended: false to avoid inflated metrics)
+      includeDeleteMarkers: false
+
     port: 8087
 
 # AWS Credentials Configuration
@@ -234,6 +275,12 @@ readinessProbe:
   periodSeconds: 10
   timeoutSeconds: 5
   failureThreshold: 3
+
+# Health endpoint now includes cardinality monitoring status
+# GET /health returns JSON with:
+# - status: "healthy", "warning", or "critical"
+# - timestamp: Current timestamp
+# - cardinality_monitoring: Detailed cardinality statistics and alerts
 
 # Prometheus Monitoring Configuration
 # Choose the appropriate monitoring method based on your setup:

@@ -54,10 +54,25 @@ func createTestConfig() *config.Config {
 				AnomalyDetection    bool `mapstructure:"anomalyDetection"`
 				LifecycleExpiration bool `mapstructure:"lifecycleExpiration"`
 				DeleteTotal         bool `mapstructure:"deleteTotal"`
+				TimestampMetrics    bool `mapstructure:"timestampMetrics"`
 			} `mapstructure:"types"`
 			ObjectSizeBuckets []float64 `mapstructure:"objectSizeBuckets"`
 			PrefixDepth       int       `mapstructure:"prefixDepth"`
 			Port              int       `mapstructure:"port"`
+			// PathLabeling - TODO: Implement in next release
+			CardinalityMonitoring struct {
+				Enabled           bool `mapstructure:"enabled"`           // Enable cardinality monitoring
+				LogInterval       int  `mapstructure:"logInterval"`       // Interval in seconds for cardinality logging
+				AlertThreshold    int  `mapstructure:"alertThreshold"`    // Alert when cardinality exceeds this value
+				CriticalThreshold int  `mapstructure:"criticalThreshold"` // Critical alert threshold
+				MaxCardinality    int  `mapstructure:"maxCardinality"`    // Maximum allowed cardinality per metric
+			} `mapstructure:"cardinalityMonitoring"`
+			DeleteEventFiltering struct {
+				Enabled               bool `mapstructure:"enabled"`
+				IncludeActualDeletes  bool `mapstructure:"includeActualDeletes"`
+				IncludeVersionDeletes bool `mapstructure:"includeVersionDeletes"`
+				IncludeDeleteMarkers  bool `mapstructure:"includeDeleteMarkers"`
+			} `mapstructure:"deleteEventFiltering"`
 		}{
 			Enabled: true,
 			Types: struct {
@@ -71,6 +86,7 @@ func createTestConfig() *config.Config {
 				AnomalyDetection    bool `mapstructure:"anomalyDetection"`
 				LifecycleExpiration bool `mapstructure:"lifecycleExpiration"`
 				DeleteTotal         bool `mapstructure:"deleteTotal"`
+				TimestampMetrics    bool `mapstructure:"timestampMetrics"`
 			}{
 				EventTotal:          true,
 				ObjectSize:          true,
@@ -82,9 +98,22 @@ func createTestConfig() *config.Config {
 				AnomalyDetection:    true,
 				LifecycleExpiration: true,
 				DeleteTotal:         true,
+				TimestampMetrics:    true,
 			},
 			ObjectSizeBuckets: []float64{1024, 102400, 1048576},
 			PrefixDepth:       2,
+			// PathLabeling - TODO: Implement in next release
+			DeleteEventFiltering: struct {
+				Enabled               bool `mapstructure:"enabled"`
+				IncludeActualDeletes  bool `mapstructure:"includeActualDeletes"`
+				IncludeVersionDeletes bool `mapstructure:"includeVersionDeletes"`
+				IncludeDeleteMarkers  bool `mapstructure:"includeDeleteMarkers"`
+			}{
+				Enabled:               true,
+				IncludeActualDeletes:  true,
+				IncludeVersionDeletes: false,
+				IncludeDeleteMarkers:  true, // Enable for tests that expect delete marker anomalies
+			},
 		},
 	}
 }
@@ -116,7 +145,7 @@ func checkPrefixDepthMetric(t *testing.T, m *Metrics, path, bucket string, expec
 		t.Errorf(errMetricNotInit, "prefixDepthTotal")
 		return
 	}
-	count := testutil.ToFloat64(m.prefixDepthTotal.WithLabelValues(path, bucket))
+	count := testutil.ToFloat64(m.prefixDepthTotal.WithLabelValues(path, bucket, "Object Created", "Put"))
 	if count != expected {
 		t.Errorf(errMetricValue, "prefixDepthTotal", count, expected)
 	}
@@ -136,6 +165,25 @@ func resetMetrics(m *Metrics) {
 		m.lifecycleTotal,
 		m.deleteTotal,
 		m.parserErrorTotal,
+		m.eventTimestamp,
+		m.eventProcessingTime,
+		m.eventAge,
+	}
+
+	// Only add cardinalityTotal if it's not nil
+	if m.cardinalityTotal != nil {
+		metricsToReset = append(metricsToReset, m.cardinalityTotal)
+	}
+
+	// Only add performance metrics if they're not nil
+	if m.messagesPerSecond != nil {
+		metricsToReset = append(metricsToReset, m.messagesPerSecond)
+	}
+	if m.parseTime != nil {
+		metricsToReset = append(metricsToReset, m.parseTime)
+	}
+	if m.batchSize != nil {
+		metricsToReset = append(metricsToReset, m.batchSize)
 	}
 
 	// Unregister each metric if it exists
@@ -143,5 +191,10 @@ func resetMetrics(m *Metrics) {
 		if metric != nil {
 			prometheus.DefaultRegisterer.Unregister(metric)
 		}
+	}
+
+	// Reset cardinality stats
+	if m.cardinalityStats != nil {
+		m.cardinalityStats = make(map[string]int)
 	}
 }

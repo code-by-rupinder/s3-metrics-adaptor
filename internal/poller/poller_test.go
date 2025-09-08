@@ -63,13 +63,29 @@ func createTestConfig(queues []string) *config.Config {
 				AnomalyDetection    bool `mapstructure:"anomalyDetection"`
 				LifecycleExpiration bool `mapstructure:"lifecycleExpiration"`
 				DeleteTotal         bool `mapstructure:"deleteTotal"`
+				TimestampMetrics    bool `mapstructure:"timestampMetrics"`
 			} `mapstructure:"types"`
 			ObjectSizeBuckets []float64 `mapstructure:"objectSizeBuckets"`
 			PrefixDepth       int       `mapstructure:"prefixDepth"`
 			Port              int       `mapstructure:"port"`
+			// PathLabeling - TODO: Implement in next release
+			CardinalityMonitoring struct {
+				Enabled           bool `mapstructure:"enabled"`           // Enable cardinality monitoring
+				LogInterval       int  `mapstructure:"logInterval"`       // Interval in seconds for cardinality logging
+				AlertThreshold    int  `mapstructure:"alertThreshold"`    // Alert when cardinality exceeds this value
+				CriticalThreshold int  `mapstructure:"criticalThreshold"` // Critical alert threshold
+				MaxCardinality    int  `mapstructure:"maxCardinality"`    // Maximum allowed cardinality per metric
+			} `mapstructure:"cardinalityMonitoring"`
+			DeleteEventFiltering struct {
+				Enabled               bool `mapstructure:"enabled"`
+				IncludeActualDeletes  bool `mapstructure:"includeActualDeletes"`
+				IncludeVersionDeletes bool `mapstructure:"includeVersionDeletes"`
+				IncludeDeleteMarkers  bool `mapstructure:"includeDeleteMarkers"`
+			} `mapstructure:"deleteEventFiltering"`
 		}{
 			Enabled: true,
 			Port:    8080,
+			// PathLabeling - TODO: Implement in next release
 		},
 	}
 }

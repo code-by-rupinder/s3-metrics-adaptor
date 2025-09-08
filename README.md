@@ -12,6 +12,7 @@ A high-performance Prometheus metrics adapter that transforms Amazon S3 events f
 - **Real-time S3 Event Processing** - Convert S3 events from SQS into Prometheus metrics
 - **Comprehensive Metrics** - 12+ metric types covering events, sizes, users, IPs, and anomalies
 - **Advanced Analytics** - File extension tracking, hierarchical path analysis, and anomaly detection
+- **Load Testing Suite** - Built-in scripts for bulk testing, performance validation, and anomaly detection
 - **Production Ready** - Built with Go, optimized Docker images (14.5MB), and comprehensive monitoring
 - **Highly Configurable** - Enable/disable metrics individually, custom histogram buckets, flexible filtering
 - **Security First** - Distroless container images, non-root execution, minimal attack surface
@@ -53,6 +54,45 @@ docker run -d \
 # Check metrics
 curl http://localhost:8087/metrics
 ```
+
+## Load Testing
+
+The S3 Metrics Adapter includes comprehensive load testing scripts to validate performance and functionality:
+
+### Quick Load Test
+
+```bash
+# Test with 100 files (default)
+./scripts/test/quick_load_test.sh
+
+# Test with custom number of files
+./scripts/test/quick_load_test.sh -f 500
+```
+
+### Bulk Load Test
+
+```bash
+# Full-scale load test with 1000 files
+./scripts/test/bulk_delete_load_test.sh
+
+# Custom load test
+./scripts/test/bulk_delete_load_test.sh -f 5000 -b 100
+```
+
+### Anomaly Detection Test
+
+```bash
+# Test anomaly detection functionality
+./scripts/test/test_anomaly_detection.sh
+```
+
+These scripts will:
+
+- Create test files with various extensions
+- Monitor metrics in real-time
+- Test bulk deletion performance
+- Validate anomaly detection
+- Generate performance reports
 
 ### Binary Download
 

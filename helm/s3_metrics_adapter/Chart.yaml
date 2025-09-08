@@ -2,8 +2,8 @@ apiVersion: v2
 name: s3-metrics-adapter
 description: A Prometheus s3 metrics adapter  for AWS S3 events that converts SQS events to Prometheus metrics
 type: application
-version: 1.0.0
-appVersion: "1.0.0"
+version: 1.2.0
+appVersion: "1.2.0"
 
 keywords:
   - aws
@@ -17,6 +17,7 @@ keywords:
 home: https://github.com/code-by-rupinder/s3-metrics-adaptor
 sources:
   - https://github.com/code-by-rupinder/s3-metrics-adaptor
+icon: https://raw.githubusercontent.com/code-by-rupinder/s3-metrics-adaptor/main/docs/logo.png
 
 maintainers:
   - name: codebyrupinder
@@ -27,4 +28,4 @@ annotations:
   licenses: MIT
   images: |
     - name: s3-metrics-prom-adaptor
-      image: codebyrupinder/s3-metrics-prom-adaptor:v1.0.0
+      image: codebyrupinder/s3-metrics-prom-adaptor:v1.2.0
