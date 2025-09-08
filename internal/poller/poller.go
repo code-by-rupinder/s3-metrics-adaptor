@@ -267,7 +267,12 @@ func (bp *BatchProcessor) processBatch() {
 
 	// Process the batch
 	if bp.processor != nil {
-		bp.processor(batch)
+		if err := bp.processor(batch); err != nil {
+			logger.Error(logger.LogContext{
+				Component: "poller",
+				Operation: "processBatch",
+			}, err, "Failed to process message batch")
+		}
 	}
 }
 

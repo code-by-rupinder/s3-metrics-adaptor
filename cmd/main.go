@@ -354,7 +354,12 @@ func main() {
 				Component: "Main",
 			}, err, "Failed to marshal health response")
 			w.WriteHeader(http.StatusInternalServerError)
-			w.Write([]byte(`{"status":"error","message":"Failed to generate health response"}`))
+			if _, writeErr := w.Write([]byte(`{"status":"error","message":"Failed to generate health response"}`)); writeErr != nil {
+				logger.Error(logger.LogContext{
+					Operation: "HealthHandler",
+					Component: "Main",
+				}, writeErr, "Failed to write error response")
+			}
 			return
 		}
 
