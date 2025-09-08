@@ -17,6 +17,7 @@ keywords:
 home: https://github.com/code-by-rupinder/s3-metrics-adaptor
 sources:
   - https://github.com/code-by-rupinder/s3-metrics-adaptor
+icon: https://raw.githubusercontent.com/code-by-rupinder/s3-metrics-adaptor/main/docs/logo.png
 
 maintainers:
   - name: codebyrupinder
